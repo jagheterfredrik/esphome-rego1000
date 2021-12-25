@@ -6,6 +6,4 @@ ESPHome component for Rego 1000 heat pump controller, found in:
 * IVT Premiumline EQ
 * IVT Premiumline HQ
 
-RX and TX pins for a CAN bus transceiver must be set in regoreader.h, `CAN_cfg.tx_pin_id` and `CAN_cfg.rx_pin_id`.
-
 Code inspired by [esphome-p1reader](https://github.com/psvanstrom/esphome-p1reader), temperature lookup table extracted from [taloLogger](https://zil.olammi.iki.fi/sw/taloLogger/).
