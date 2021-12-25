@@ -2,8 +2,6 @@ esphome:
   name: esp-rego1000
   includes:
     - regoreader.h
-  libraries:
-    - "miwagner/ESP32CAN"
 
 esp32:
   board: nodemcu-32s
@@ -36,7 +34,7 @@ ota:
 sensor:
   - platform: custom
     lambda: |-
-      auto rego_sensor = new RegoReader();
+      auto rego_sensor = new RegoReader(GPIO_NUM_23, GPIO_NUM_22);
       App.register_component(rego_sensor);
       return {
         rego_sensor->heat_carrier_1,

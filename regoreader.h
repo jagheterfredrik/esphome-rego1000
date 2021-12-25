@@ -27,9 +27,11 @@ class RegoReader : public Component {
     Sensor *cold_fluid_in = new Sensor();
     Sensor *cold_fluid_out = new Sensor();
 
+    RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {}
+
     void setup() {
       //Initialize configuration structures using macro initializers
-      can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(GPIO_NUM_23, GPIO_NUM_22, CAN_MODE_NORMAL);
+      can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(this->tx, this->rx, CAN_MODE_NORMAL);
       can_timing_config_t t_config = CAN_TIMING_CONFIG_125KBITS();
       can_filter_config_t f_config = CAN_FILTER_CONFIG_ACCEPT_ALL();
 
@@ -95,6 +97,9 @@ class RegoReader : public Component {
     }
 
   private:
+    gpio_num_t tx;
+    gpio_num_t rx;
+
     void publish_temperature(uint32_t msg_id, uint8_t dlc, uint8_t* data, Sensor *sensor) {
       if (dlc != 2) {
         ESP_LOGE(TAG, "Expected DLC of 2 for 0x%08X, got %d", msg_id, dlc);
