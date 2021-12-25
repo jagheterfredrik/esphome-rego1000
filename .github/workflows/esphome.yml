@@ -1,0 +1,25 @@
+name: ESPHome
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+    - name: ESPHome
+      run: |
+        python -m pip install --upgrade pip
+        pip install esphome
+        echo "wifi_ssid: \"\"\nwifi_password: \"\"\nfallback_password: \"\"\nhass_api_password: \"\"\nota_password: \"\"\n" > secrets.yaml
+        esphome compile rego1000.yaml
