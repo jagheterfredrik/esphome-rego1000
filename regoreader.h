@@ -27,6 +27,13 @@ class RegoReader : public Component {
     Sensor *cold_fluid_in = new Sensor();
     Sensor *cold_fluid_out = new Sensor();
 
+    Sensor *heat_carrier_pump = new Sensor();
+    Sensor *heat_fluid_pump = new Sensor();
+    Sensor *three_way_valve = new Sensor();
+    Sensor *additional_heat = new Sensor();
+    Sensor *compressor = new Sensor();
+    Sensor *cold_fluid_pump = new Sensor();
+
     RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {}
 
     void setup() {
@@ -73,24 +80,36 @@ class RegoReader : public Component {
           }
           ESP_LOGD(TAG, "\n");
 
-          if (message.identifier == 0x08000270) { //Heat carrier 1
+          if (message.identifier == 0x08000260) { //Heat carrier 1
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->heat_carrier_1);
-          } else if (message.identifier == 0x08004270) { //Outdoor
+          } else if (message.identifier == 0x08004260) { //Outdoor
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->outdoor);
-          } else if (message.identifier == 0x08008270) { //Warm water
+          } else if (message.identifier == 0x08008260) { //Warm water
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->warm_water);
-          } else if (message.identifier == 0x0800c270) { //Heat carrier 2
+          } else if (message.identifier == 0x0800c260) { //Heat carrier 2
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->heat_carrier_2);
-          } else if (message.identifier == 0x08010270) { //Hot gas
+          } else if (message.identifier == 0x08010260) { //Hot gas
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->hot_gas);
-          } else if (message.identifier == 0x08014270) { //Heat fluid out
+          } else if (message.identifier == 0x08014260) { //Heat fluid out
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->heat_fluid_out);
-          } else if (message.identifier == 0x08018270) { //Heat fluid in
+          } else if (message.identifier == 0x08018260) { //Heat fluid in
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->heat_fluid_in);
-          } else if (message.identifier == 0x0801c270) { //Cold fluid in
+          } else if (message.identifier == 0x0801c260) { //Cold fluid in
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->cold_fluid_in);
-          } else if (message.identifier == 0x08020270) { //Cold fluid out
+          } else if (message.identifier == 0x08020260) { //Cold fluid out
             this->publish_temperature(message.identifier, message.data_length_code, message.data, this->cold_fluid_out);
+          } else if (message.identifier == 0x00028260) { //Heat carrier pump
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->heat_carrier_pump);
+          } else if (message.identifier == 0x0002c260) { //Heat fluid pump
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->heat_fluid_pump);
+          } else if (message.identifier == 0x00038260) { //Three-way valve
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->three_way_valve);
+          } else if (message.identifier == 0x0003c260) { //Additional heat
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->additional_heat);
+          } else if (message.identifier == 0x00048260) { //Compressor
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->compressor);
+          } else if (message.identifier == 0x00054260) { //Cold fluid pump
+            this->publish_u8(message.identifier, message.data_length_code, message.data, this->cold_fluid_pump);
           }
         }
       }
@@ -105,7 +124,7 @@ class RegoReader : public Component {
         ESP_LOGE(TAG, "Expected DLC of 2 for 0x%08X, got %d", msg_id, dlc);
         return;
       }
-      unsigned short temperature_adc_val = data[0] << 8 || data[1];
+      uint16_t temperature_adc_val = data[0] << 8 | data[1];
       float temperature = temperature_from_adc(temperature_adc_val);
       sensor->publish_state(temperature);
     }
