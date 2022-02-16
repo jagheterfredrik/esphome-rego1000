@@ -31,21 +31,32 @@ api:
 ota:
   password: !secret ota_password
 
+custom_component:
+  - id: rego_sensor
+    lambda: |-
+      RegoReader* rego_sensor = rego_sensor->getInstance();
+      App.register_component(rego_sensor);
+      return {rego_sensor};
+
 sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Sensor"
+    update_interval: 60s
   - platform: custom
     lambda: |-
-      auto rego_sensor = new RegoReader(GPIO_NUM_23, GPIO_NUM_22);
-      App.register_component(rego_sensor);
+      RegoReader* rego_sensor = rego_sensor->getInstance();
       return {
         rego_sensor->heat_carrier_1,
         rego_sensor->outdoor,
         rego_sensor->warm_water,
-        rego_sensor->heat_carrier_2,
         rego_sensor->hot_gas,
         rego_sensor->heat_fluid_out,
         rego_sensor->heat_fluid_in,
         rego_sensor->cold_fluid_in,
-        rego_sensor->cold_fluid_out
+        rego_sensor->cold_fluid_out,
+        rego_sensor->heat_fluid_pump_control,
+        rego_sensor->heating_setpoint,
+        rego_sensor->energy_output
       };
     sensors:
     - name: "Heat Carrier 1"
@@ -55,9 +66,6 @@ sensor:
       unit_of_measurement: °C
       accuracy_decimals: 1
     - name: "Warm water"
-      unit_of_measurement: °C
-      accuracy_decimals: 1
-    - name: "Heat carrier 2"
       unit_of_measurement: °C
       accuracy_decimals: 1
     - name: "Hot gas"
@@ -75,3 +83,33 @@ sensor:
     - name: "Cold fluid out"
       unit_of_measurement: °C
       accuracy_decimals: 1
+    - name: "Heat fluid pump control"
+      unit_of_measurement: "%"
+    - name: "Heating setpoint"
+      unit_of_measurement: °C
+      accuracy_decimals: 1
+    - name: "Energy output"
+      unit_of_measurement: kWh
+      state_class: "total_increasing"
+      device_class: "energy"
+      accuracy_decimals: 2
+
+binary_sensor:
+- platform: custom
+  lambda: |-
+    RegoReader* rego_sensor = rego_sensor->getInstance();
+    return {
+      rego_sensor->heat_carrier_pump,
+      rego_sensor->heat_fluid_pump,
+      rego_sensor->three_way_valve,
+      rego_sensor->additional_heat,
+      rego_sensor->compressor,
+      rego_sensor->cold_fluid_pump
+    };
+  binary_sensors:
+  - name: "Heat carrier pump"
+  - name: "Heat fluid pump"
+  - name: "Three-way valve"
+  - name: "Additional heat"
+  - name: "Compressor"
+  - name: "Cold fluid pump"
