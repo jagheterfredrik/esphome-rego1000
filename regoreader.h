@@ -14,6 +14,8 @@
 #define HEATING_SETPOINT 0x02F4
 #define STATS_ENERGY_OUTPUT 0x0714
 
+const uint16_t values_to_poll[] = {GT1_TEMP, GT2_TEMP, GT3_TEMP, GT6_TEMP, GT8_TEMP, GT9_TEMP, GT10_TEMP, GT11_TEMP, HEATING_SETPOINT, STATS_ENERGY_OUTPUT};
+
 static const char* TAG = "RegoReader";
 
 class RegoReader : public Component {
@@ -23,6 +25,7 @@ class RegoReader : public Component {
     gpio_num_t tx;
     gpio_num_t rx;
 
+    int poll_idx = 0;
     unsigned long lastest_poll = 0;
 
     RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {}
@@ -91,17 +94,10 @@ class RegoReader : public Component {
 
     void loop() {
       unsigned long now = millis();
-      if (now - lastest_poll > 10000) {
-        this->query_id(GT1_TEMP);
-        this->query_id(GT2_TEMP);
-        this->query_id(GT3_TEMP);
-        this->query_id(GT6_TEMP);
-        this->query_id(GT8_TEMP);
-        this->query_id(GT9_TEMP);
-        this->query_id(GT10_TEMP);
-        this->query_id(GT11_TEMP);
-        this->query_id(HEATING_SETPOINT);
-        this->query_id(STATS_ENERGY_OUTPUT);
+      if (now - lastest_poll > 500) {
+        this->query_id(values_to_poll[poll_idx++]);
+        int number_of_values_to_poll = sizeof(values_to_poll)/sizeof(*values_to_poll);
+        poll_idx %= number_of_values_to_poll;
         lastest_poll = now;
       }
 
