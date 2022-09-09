@@ -11,14 +11,17 @@
 #define GT9_TEMP 0x0275
 #define GT10_TEMP 0x0212
 #define GT11_TEMP 0x0220
+#define HEATING_START 0x02F6
+#define HEATING_STOP 0x02FB
 #define HEATING_SETPOINT 0x02F4
+#define ROOM_SETPOINT_BASE_TEMP 0x0656
 #define STATS_ENERGY_OUTPUT 0x0714
 
-const uint16_t values_to_poll[] = {GT1_TEMP, GT2_TEMP, GT3_TEMP, GT6_TEMP, GT8_TEMP, GT9_TEMP, GT10_TEMP, GT11_TEMP, HEATING_SETPOINT, STATS_ENERGY_OUTPUT};
+const uint16_t values_to_poll[] = { GT1_TEMP, GT2_TEMP, GT3_TEMP, GT6_TEMP, GT8_TEMP, GT9_TEMP, GT10_TEMP, GT11_TEMP, HEATING_START, HEATING_STOP, HEATING_SETPOINT, ROOM_SETPOINT_BASE_TEMP, STATS_ENERGY_OUTPUT };
 
 static const char* TAG = "RegoReader";
 
-class RegoReader : public Component {
+class RegoReader : public Component, public Climate {
   protected:
     static RegoReader *instance;
 
@@ -28,7 +31,12 @@ class RegoReader : public Component {
     int poll_idx = 0;
     unsigned long lastest_poll = 0;
 
-    RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {}
+    RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {
+      this->preset = CLIMATE_PRESET_HOME;
+      this->mode = CLIMATE_MODE_HEAT;
+      this->action = CLIMATE_ACTION_HEATING;
+      this->publish_state();
+    }
 
   public:
     Sensor *heat_carrier_1 = new Sensor();
@@ -39,6 +47,8 @@ class RegoReader : public Component {
     Sensor *heat_fluid_in = new Sensor();
     Sensor *cold_fluid_in = new Sensor();
     Sensor *cold_fluid_out = new Sensor();
+    Sensor *heating_start = new Sensor();
+    Sensor *heating_stop = new Sensor();
 
     Sensor *heat_fluid_pump_control = new Sensor();
 
@@ -57,7 +67,7 @@ class RegoReader : public Component {
         instance = new RegoReader(GPIO_NUM_23, GPIO_NUM_22);
       }
       return instance;
-   }
+    }
 
     void setup() {
       //Initialize configuration structures using macro initializers
@@ -84,21 +94,73 @@ class RegoReader : public Component {
       }
     }
 
+    void control(const ClimateCall &call) override {
+      if (call.get_target_temperature().has_value()) {
+        this->target_temperature = *call.get_target_temperature();
+        this->publish_state();
+        int16_t indoor_setpoint = round(this->target_temperature * 10);
+        set_rego_variable(ROOM_SETPOINT_BASE_TEMP, indoor_setpoint);
+      }
+    }
+
+    ClimateTraits traits() override {
+      // The capabilities of the climate device
+      auto traits = climate::ClimateTraits();
+      traits.set_supports_current_temperature(true);
+      traits.set_supported_modes({climate::CLIMATE_MODE_HEAT});
+      traits.set_visual_min_temperature(12.0);
+      traits.set_visual_max_temperature(25.0);
+      traits.set_visual_temperature_step(0.1);
+      return traits;
+    }
+
     void query_id(uint16_t idx) {
-        can_message_t out_message;
-        out_message.flags = CAN_MSG_FLAG_RTR | CAN_MSG_FLAG_EXTD;
-        out_message.identifier = (idx << 14) | 0x04003FE0;
-        out_message.data_length_code = 0;
-        can_transmit(&out_message, pdMS_TO_TICKS(1000));
+      can_message_t out_message;
+      out_message.flags = CAN_MSG_FLAG_RTR | CAN_MSG_FLAG_EXTD;
+      out_message.identifier = (idx << 14) | 0x04003FE0;
+      out_message.data_length_code = 0;
+      can_transmit(&out_message, pdMS_TO_TICKS(1000));
+    }
+
+    void set_rego_variable(uint16_t idx, int16_t val) {
+      can_message_t out_message;
+      out_message.flags = CAN_MSG_FLAG_EXTD;
+      out_message.identifier = (idx << 14) | 0x04003FE0;
+      out_message.data_length_code = 2;
+      out_message.data[0] = (val >> 8) & 0xff;
+      out_message.data[1] = val & 0xff;
+      can_transmit(&out_message, pdMS_TO_TICKS(1000));
+    }
+
+    void send_gt5_temp(int16_t temp) {
+      can_message_t out_message;
+      out_message.flags = CAN_MSG_FLAG_EXTD;
+      out_message.identifier = 0x10000060;
+      out_message.data_length_code = 2;
+      out_message.data[0] = (temp >> 8) & 0xff;
+      out_message.data[1] = temp & 0xff;
+      can_transmit(&out_message, pdMS_TO_TICKS(1000));
     }
 
     void loop() {
       unsigned long now = millis();
+
       if (now - lastest_poll > 500) {
         this->query_id(values_to_poll[poll_idx++]);
         int number_of_values_to_poll = sizeof(values_to_poll)/sizeof(*values_to_poll);
         poll_idx %= number_of_values_to_poll;
         lastest_poll = now;
+
+
+        if (id(indoor_temp).state != this->current_temperature) {
+          this->current_temperature = id(indoor_temp).state;
+          this->publish_state();
+        }
+
+        if (poll_idx==0 && !isnan(this->current_temperature)) {
+          int16_t indoor_temp = round(this->current_temperature * 10);
+          send_gt5_temp(indoor_temp);
+        }
       }
 
       can_message_t message;
@@ -139,6 +201,15 @@ class RegoReader : public Component {
             this->publish_deg_temperature(message.identifier, message.data_length_code, message.data, this->cold_fluid_in);
           } else if (message.identifier == (0x0C003FE0 | (GT11_TEMP << 14))) { //Cold fluid out
             this->publish_deg_temperature(message.identifier, message.data_length_code, message.data, this->cold_fluid_out);
+          } else if (message.identifier == (0x0C003FE0 | (HEATING_START << 14))) { //Heating start
+            this->publish_deg_temperature(message.identifier, message.data_length_code, message.data, this->heating_start);
+          } else if (message.identifier == (0x0C003FE0 | (HEATING_STOP << 14))) { //Heating stop
+            this->publish_deg_temperature(message.identifier, message.data_length_code, message.data, this->heating_stop);
+          } else if (message.identifier == (0x0C003FE0 | (ROOM_SETPOINT_BASE_TEMP << 14))) { //Heating stop
+            int16_t temperature_val = message.data[0] << 8 | message.data[1];
+            float temperature = (float)temperature_val/10.f;
+            this->target_temperature = temperature;
+            this->publish_state();
           } else if (message.identifier == (0x0C003FE0 | (STATS_ENERGY_OUTPUT << 14))) { //Energy output
             this->publish_kwh(message.identifier, message.data_length_code, message.data, this->energy_output);
           } else {

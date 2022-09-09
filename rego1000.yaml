@@ -21,7 +21,7 @@ captive_portal:
 
 # Enable logging
 logger:
-  level: DEBUG
+  level: INFO
   baud_rate: 0 # disable logging over uart
   
 # Enable Home Assistant API
@@ -31,17 +31,33 @@ api:
 ota:
   password: !secret ota_password
 
+
 custom_component:
   - id: rego_sensor
     lambda: |-
       RegoReader* rego_sensor = rego_sensor->getInstance();
-      App.register_component(rego_sensor);
       return {rego_sensor};
+
+climate:
+  - platform: custom
+    lambda: |-
+      RegoReader* rego_sensor = rego_sensor->getInstance();
+      return {rego_sensor};
+    climates:
+     - name: "Indoor setpoint"
+       id: pid_climate
 
 sensor:
   - platform: wifi_signal
     name: "WiFi Signal Sensor"
     update_interval: 60s
+  - platform: homeassistant
+    entity_id: sensor.indoor_temp
+    id : indoor_temp
+    accuracy_decimals: 1
+    filters:
+    - sliding_window_moving_average:
+        window_size: 80
   - platform: custom
     lambda: |-
       RegoReader* rego_sensor = rego_sensor->getInstance();
@@ -54,6 +70,8 @@ sensor:
         rego_sensor->heat_fluid_in,
         rego_sensor->cold_fluid_in,
         rego_sensor->cold_fluid_out,
+        rego_sensor->heating_start,
+        rego_sensor->heating_stop,
         rego_sensor->heat_fluid_pump_control,
         rego_sensor->heating_setpoint,
         rego_sensor->energy_output
@@ -81,6 +99,12 @@ sensor:
       unit_of_measurement: °C
       accuracy_decimals: 1
     - name: "Cold fluid out"
+      unit_of_measurement: °C
+      accuracy_decimals: 1
+    - name: "Heating start"
+      unit_of_measurement: °C
+      accuracy_decimals: 1
+    - name: "Heating stop"
       unit_of_measurement: °C
       accuracy_decimals: 1
     - name: "Heat fluid pump control"
