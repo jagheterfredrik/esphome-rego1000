@@ -5,15 +5,15 @@
 
 static const char* TAG = "RegoReader";
 
-static const unsigned int MAX_READ_SIZE = 0x100;
+static const unsigned int MAX_READ_SIZE = 0x5000;
 
-struct __attribute__((__packed__)) RegoVariableHeader {
+typedef struct __attribute__((__packed__)) RegoVariableHeader {
   uint8_t idx[2];
   uint8_t unknown[7];
   uint8_t max_val[4];
   uint8_t min_val[4];
   uint8_t name_length;
-} rego_var;
+} rego_hdr;
 
 class RegoReader : public Component {
   protected:
@@ -23,18 +23,18 @@ class RegoReader : public Component {
     gpio_num_t rx;
 
     uint8_t *buf;
-    uint8_t *bufPtr;
+    uint8_t *buf_ptr;
+    uint8_t leftover = 0;
 
     bool read_hdr = true;
     uint32_t remote_rd_ptr = 0x0;
-    uint8_t read_len;
 
     uint8_t ctr = 0;
     unsigned long cooldown;
 
     RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {
       buf = (uint8_t*) malloc(MAX_READ_SIZE);
-      bufPtr = buf;
+      buf_ptr = buf;
     }
 
     ~RegoReader() {
@@ -100,8 +100,7 @@ class RegoReader : public Component {
         }
       }
       if (state == 1) { // Set read addr
-        bufPtr = buf;
-        read_len = read_hdr ? 18 : rego_var.name_length;
+        buf_ptr = &buf[leftover];
 
         can_message_t out_message;
         out_message.flags = CAN_MSG_FLAG_EXTD;
@@ -109,8 +108,8 @@ class RegoReader : public Component {
         out_message.data_length_code = 8;
         out_message.data[0] = 0x00;
         out_message.data[1] = 0x00;
-        out_message.data[2] = 0x00;
-        out_message.data[3] = read_len;
+        out_message.data[2] = 0x4E;
+        out_message.data[3] = 0x20;
         out_message.data[4] = (remote_rd_ptr >> 24) & 0xff;
         out_message.data[5] = (remote_rd_ptr >> 16) & 0xff;
         out_message.data[6] = (remote_rd_ptr >> 8) & 0xff;
@@ -128,43 +127,54 @@ class RegoReader : public Component {
         out_message.data_length_code = 0;
         if (can_transmit(&out_message, pdMS_TO_TICKS(1000)) == ESP_OK) {
           ESP_LOGD(TAG, "Read request QUEUED");
-          remote_rd_ptr += read_len;
-          ++state;
+          remote_rd_ptr += 0x4E20;
+          state = 0xff;
         } else {
           ESP_LOGD(TAG, "Read request FAILED");
         }
-      } else if (state == 3) { // Parse data
-        can_message_t message;
-        while (can_receive(&message, 0U) == ESP_OK) {
-          if (message.identifier == 0x09FDBFE0 || message.identifier == 0x09FDFFE0) {
-            // 0x09FDBFE0 - More data available
-            // 0x09FDFFE0 - No more data available
-            dump_message(message);
-            memcpy(bufPtr, message.data, message.data_length_code);
-            bufPtr += message.data_length_code;
+      } else if (state == 3 || state == 4) { // Parse data
+        uint8_t *parse_ptr = buf;
+        while(1) {
+          if (buf_ptr - parse_ptr < sizeof(rego_hdr)) break;
+          rego_hdr *hdr = (rego_hdr *)parse_ptr;
+          if (buf_ptr - parse_ptr < sizeof(rego_hdr) + hdr->name_length) break;
+          parse_ptr += sizeof(rego_hdr);
+          
+          ESP_LOGI(TAG, "0x%.2X%.2X: %.*s", hdr->idx[0], hdr->idx[1], hdr->name_length, parse_ptr);
 
-            ESP_LOGD(TAG, "Got %d now, total %d, want %d", message.data_length_code, read_len, bufPtr - buf);
+          parse_ptr += hdr->name_length;
+        }
 
-            if (bufPtr - buf >= read_len) { // Read all data
-              if (read_hdr) {
-                memcpy(&rego_var, buf, read_len);
-                read_hdr = false;
-                ESP_LOGD(TAG, "Got header %d, %d, %d, %d", rego_var.idx, rego_var.max_val, rego_var.min_val, rego_var.name_length);
-                state = 4;
-              } else {
-                ESP_LOGI(TAG, "0x%.2X%.2X: %.*s", rego_var.idx[0], rego_var.idx[1], rego_var.name_length, buf);
-                read_hdr = true;
-                state = 4;
-              }
-              cooldown = millis();
-            }
-            if (message.identifier == 0x09FDFFE0) { //No more data
-              state = 0xff; //Die
-            }
+        leftover = buf_ptr - parse_ptr;
+        if (leftover > 0) {
+          memcpy(buf, parse_ptr, leftover);
+        }
+        if (state == 3)
+          state = 1;
+        else
+          state = 0xff;
+      }
+
+      can_message_t message;
+      while (can_receive(&message, 0U) == ESP_OK) {
+        if (message.identifier == 0x09FDBFE0 || message.identifier == 0x09FDFFE0) {
+          // 0x09FDBFE0 - More data available
+          // 0x09FDFFE0 - No more data available
+          
+          memcpy(buf_ptr, message.data, message.data_length_code);
+          buf_ptr += message.data_length_code;
+
+          if ((buf_ptr - buf) % 0x500 == 0)
+            ESP_LOGD(TAG, "read %d", buf_ptr - buf);
+
+          if (buf_ptr - buf >= 0x4e20 + leftover) { // Read all data
+            state = 3;
+          }
+          if (message.identifier == 0x09FDFFE0) { //No more data
+            state = 4;
+            ESP_LOGD(TAG, "Got end of data flag");
           }
         }
-      } else if (state == 4) { // Cool down
-        if (millis() - cooldown > 100) { state = 1; }
       }
     }
 
