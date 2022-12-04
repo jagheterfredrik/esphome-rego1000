@@ -38,6 +38,16 @@ custom_component:
       RegoReader* rego_sensor = rego_sensor->getInstance();
       return {rego_sensor};
 
+switch:
+  - platform: custom
+    lambda: |-
+      RegoReader* rego_sensor = rego_sensor->getInstance();
+      return {
+        rego_sensor->dhw_state_economy
+      };
+    switches:
+      name: "DHW Economy"
+
 climate:
   - platform: custom
     lambda: |-
@@ -55,9 +65,6 @@ sensor:
     entity_id: sensor.indoor_temp
     id : indoor_temp
     accuracy_decimals: 1
-    filters:
-    - sliding_window_moving_average:
-        window_size: 80
   - platform: custom
     lambda: |-
       RegoReader* rego_sensor = rego_sensor->getInstance();

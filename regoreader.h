@@ -3,6 +3,7 @@
 #include "driver/gpio.h"
 #include "driver/can.h"
 
+#define DHW_STATE_ECONOMY 0x01A0
 #define GT1_TEMP 0x022C
 #define GT2_TEMP 0x0230
 #define GT3_TEMP 0x0237
@@ -17,9 +18,37 @@
 #define ROOM_SETPOINT_BASE_TEMP 0x0656
 #define STATS_ENERGY_OUTPUT 0x0714
 
-const uint16_t values_to_poll[] = { GT1_TEMP, GT2_TEMP, GT3_TEMP, GT6_TEMP, GT8_TEMP, GT9_TEMP, GT10_TEMP, GT11_TEMP, HEATING_START, HEATING_STOP, HEATING_SETPOINT, ROOM_SETPOINT_BASE_TEMP, STATS_ENERGY_OUTPUT };
+const uint16_t values_to_poll[] = { DHW_STATE_ECONOMY, GT1_TEMP, GT2_TEMP, GT3_TEMP, GT6_TEMP, GT8_TEMP, GT9_TEMP, GT10_TEMP, GT11_TEMP, HEATING_START, HEATING_STOP, HEATING_SETPOINT, ROOM_SETPOINT_BASE_TEMP, STATS_ENERGY_OUTPUT };
 
 static const char* TAG = "RegoReader";
+
+static void query_id(uint16_t idx) {
+  can_message_t out_message;
+  out_message.flags = CAN_MSG_FLAG_RTR | CAN_MSG_FLAG_EXTD;
+  out_message.identifier = (idx << 14) | 0x04003FE0;
+  out_message.data_length_code = 0;
+  can_transmit(&out_message, pdMS_TO_TICKS(1000));
+}
+
+static void set_rego_variable(uint16_t idx, int16_t val) {
+  can_message_t out_message;
+  out_message.flags = CAN_MSG_FLAG_EXTD;
+  out_message.identifier = (idx << 14) | 0x04003FE0;
+  out_message.data_length_code = 2;
+  out_message.data[0] = (val >> 8) & 0xff;
+  out_message.data[1] = val & 0xff;
+  can_transmit(&out_message, pdMS_TO_TICKS(1000));
+}
+
+class RegoBinarySwitch : public Component, public Switch {
+ public:
+    uint16_t rego_id;
+    RegoBinarySwitch(uint16_t rego_id): rego_id(rego_id) {}
+    void write_state(bool state) override {
+      set_rego_variable(this->rego_id, state ? 1 : 0);
+      publish_state(state);
+    }
+};
 
 class RegoReader : public Component, public Climate {
   protected:
@@ -30,6 +59,7 @@ class RegoReader : public Component, public Climate {
 
     int poll_idx = 0;
     unsigned long lastest_poll = 0;
+    unsigned long lastest_gt5 = 0;
 
     RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {
       this->preset = CLIMATE_PRESET_HOME;
@@ -61,6 +91,9 @@ class RegoReader : public Component, public Climate {
     BinarySensor *additional_heat = new BinarySensor();
     BinarySensor *compressor = new BinarySensor();
     BinarySensor *cold_fluid_pump = new BinarySensor();
+    // BinarySensor *dhw_state_economy = new BinarySensor(DHW_STATE_ECONOMY);
+
+    RegoBinarySwitch *dhw_state_economy = new RegoBinarySwitch(DHW_STATE_ECONOMY);
 
     static RegoReader *getInstance() {
       if (!instance) {
@@ -114,24 +147,6 @@ class RegoReader : public Component, public Climate {
       return traits;
     }
 
-    void query_id(uint16_t idx) {
-      can_message_t out_message;
-      out_message.flags = CAN_MSG_FLAG_RTR | CAN_MSG_FLAG_EXTD;
-      out_message.identifier = (idx << 14) | 0x04003FE0;
-      out_message.data_length_code = 0;
-      can_transmit(&out_message, pdMS_TO_TICKS(1000));
-    }
-
-    void set_rego_variable(uint16_t idx, int16_t val) {
-      can_message_t out_message;
-      out_message.flags = CAN_MSG_FLAG_EXTD;
-      out_message.identifier = (idx << 14) | 0x04003FE0;
-      out_message.data_length_code = 2;
-      out_message.data[0] = (val >> 8) & 0xff;
-      out_message.data[1] = val & 0xff;
-      can_transmit(&out_message, pdMS_TO_TICKS(1000));
-    }
-
     void send_gt5_temp(int16_t temp) {
       can_message_t out_message;
       out_message.flags = CAN_MSG_FLAG_EXTD;
@@ -144,23 +159,24 @@ class RegoReader : public Component, public Climate {
 
     void loop() {
       unsigned long now = millis();
+      int number_of_values_to_poll = sizeof(values_to_poll)/sizeof(*values_to_poll);
+      int poll_delay = 10000 / number_of_values_to_poll;
 
-      if (now - lastest_poll > 500) {
-        this->query_id(values_to_poll[poll_idx++]);
-        int number_of_values_to_poll = sizeof(values_to_poll)/sizeof(*values_to_poll);
+      if (now - lastest_poll > poll_delay) {
+        query_id(values_to_poll[poll_idx++]);
         poll_idx %= number_of_values_to_poll;
         lastest_poll = now;
-
 
         if (id(indoor_temp).state != this->current_temperature) {
           this->current_temperature = id(indoor_temp).state;
           this->publish_state();
         }
+      }
 
-        if (poll_idx==0 && !isnan(this->current_temperature)) {
-          int16_t indoor_temp = round(this->current_temperature * 10);
-          send_gt5_temp(indoor_temp);
-        }
+      if (now - lastest_gt5 > 5000 && !isnan(this->current_temperature)) {
+        int16_t indoor_temp = round(this->current_temperature * 10);
+        send_gt5_temp(indoor_temp);
+        lastest_gt5 = now;
       }
 
       can_message_t message;
@@ -183,6 +199,8 @@ class RegoReader : public Component, public Climate {
             this->publish_binary(message.identifier, message.data_length_code, message.data, this->cold_fluid_pump);
           } else if (message.identifier == 0x00090260) { //Heat fluid pump control
             this->publish_u8(message.identifier, message.data_length_code, message.data, this->heat_fluid_pump_control);
+          } else if (message.identifier == (0x0C003FE0 | (DHW_STATE_ECONOMY << 14))) { //DHW Economy
+            this->publish_binary(message.identifier, message.data_length_code, message.data, this->dhw_state_economy);
           } else if (message.identifier == (0x0C003FE0 | (HEATING_SETPOINT << 14))) { //Heating setpoint
            this->publish_deg_temperature(message.identifier, message.data_length_code, message.data, this->heating_setpoint);
           } else if (message.identifier == (0x0C003FE0 | (GT1_TEMP << 14))) { //Heat carrier 1
@@ -255,6 +273,14 @@ class RegoReader : public Component, public Climate {
     }
 
     void publish_binary(uint32_t msg_id, uint8_t dlc, uint8_t* data, BinarySensor *sensor) {
+      if (dlc != 1) {
+        ESP_LOGE(TAG, "Expected DLC of 1 for 0x%08X, got %d", msg_id, dlc);
+        return;
+      }
+      sensor->publish_state(!!data[0]);
+    }
+
+    void publish_binary(uint32_t msg_id, uint8_t dlc, uint8_t* data, RegoBinarySwitch *sensor) {
       if (dlc != 1) {
         ESP_LOGE(TAG, "Expected DLC of 1 for 0x%08X, got %d", msg_id, dlc);
         return;
