@@ -24,7 +24,7 @@ ota:
   password: !secret ota_password
 
 external_components:
-  - source: components
+  - source: github://jagheterfredrik/esphome-rego1000
 
 canbus:
   - platform: esp32_can
