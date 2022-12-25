@@ -4,6 +4,13 @@ ESPHome component for Rego 1000 heat pump controller, found in:
 * IVT Premiumline EQ
 * IVT Premiumline HQ
 
+### Features
+* Poll any variable from heat pump (temperature sensors, timers, PID control values..)
+* Read any passive data on the heat pump CAN bus (used for i.e. compressor on/off state)
+* Set indoor setpoint using the Home assistant climate integration
+* Act as an IVT indoor sensor using the tempeature from a home assistant integrated temperature sensor
+* Set any heat pump variable, e.g. hysterisis, admin access, hot water eco/comfort mode
+
 ### Connection
 ![Connection overview](connection_overview.jpg)
 ![Connection](connection.jpg)
