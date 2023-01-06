@@ -3,7 +3,9 @@
 
 #include <vector>
 
-#define INDOOR_THERMOSTAT_CAN_ID 0x10000060
+#define INDOOR_THERMOSTAT_TEMP_CAN_ID 0x10000060
+#define INDOOR_THERMOSTAT_DIAL_CAN_ID 0x10004060
+#define INDOOR_THERMOSTAT_DIAL_MIDPOINT 0x200
 
 using namespace esphome;
 using namespace esphome::climate;
@@ -41,7 +43,8 @@ public:
       this->current_temperature = this->indoor_sensor->state;
       this->publish_state();
       int16_t indoor_temp = static_cast<uint16_t>(this->current_temperature / this->value_factor);
-      this->canbus->send_data(INDOOR_THERMOSTAT_CAN_ID, true, false, value_to_can_data(indoor_temp));
+      this->canbus->send_data(INDOOR_THERMOSTAT_DIAL_CAN_ID, true, false, value_to_can_data(INDOOR_THERMOSTAT_DIAL_MIDPOINT));
+      this->canbus->send_data(INDOOR_THERMOSTAT_TEMP_CAN_ID, true, false, value_to_can_data(indoor_temp));
     }
   }
   void control(const ClimateCall &call) override {
