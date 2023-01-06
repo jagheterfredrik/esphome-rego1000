@@ -11,6 +11,9 @@ ESPHome component for Rego 1000 heat pump controller, found in:
 * Act as an IVT indoor sensor using the tempeature from a home assistant integrated temperature sensor
 * Set any heat pump variable, e.g. hysterisis, admin access, hot water eco/comfort mode
 
+### Note
+esphome version 2022.12.0+ seems broken, stay on 2022.11.5 or below.
+
 ### Connection
 ![Connection overview](connection_overview.jpg)
 ![Connection](connection.jpg)
