@@ -24,7 +24,9 @@ ota:
   password: !secret ota_password
 
 external_components:
-  - source: github://jagheterfredrik/esphome-rego1000
+  - source: components
+
+web_server:
 
 canbus:
   - platform: esp32_can
@@ -38,7 +40,6 @@ climate:
   - platform: rego1000
     name: House
     rego_setpoint_variable: 0x0656
-    value_factor: .1
     sensor_id: indoor_temp
 
 sensor:
@@ -176,6 +177,18 @@ number:
   max_value: 30
   step: 1
   value_factor: .1
+- platform: rego1000
+  name: Room dial range
+  rego_variable: 0x0611
+  min_value: 0
+  max_value: 6
+  step: 1
+- platform: rego1000
+  name: "Admin access num"
+  rego_variable: 0x0001
+  min_value: 0
+  max_value: 200
+  step: 1
 
 switch:
 - platform: rego1000

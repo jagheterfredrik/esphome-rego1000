@@ -13,8 +13,8 @@ public:
     this->publish_state(value);
   }
   void control(float value) override {
-    uint16_t ival = static_cast<uint16_t>(value / this->value_factor);
-    this->canbus->send_data(this->can_poll_id, true, false, value_to_can_data(ival));
+    uint32_t ival = value / this->value_factor;
+    this->send_data(this->can_poll_id, ival);
     this->publish_state(value);
   }
 };

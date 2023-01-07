@@ -10,7 +10,7 @@ namespace rego {
 class RegoBinarySensor : public binary_sensor::BinarySensor, public RegoBase {
 public:
   virtual void publish(float value) override {
-    this->publish_state(static_cast<bool>(value));
+    this->publish_state((bool)value);
   }
 };
 

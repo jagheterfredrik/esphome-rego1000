@@ -53,6 +53,7 @@ public:
   }
 
   virtual void data_recv(std::vector<uint8_t> data, uint32_t can_id) {
+    this->inferred_data_len = data.size();
     int value = this->parse_data(data);
     this->publish(value * this->value_factor);
   }
@@ -91,15 +92,26 @@ public:
     this->poll_interval = poll_interval;
   }
 
-  /* Helpers */
-  std::vector<uint8_t> value_to_can_data(uint16_t ival) {
-    return std::vector<uint8_t>({ static_cast<uint8_t>((ival >> 8) & 0xff), static_cast<uint8_t>(ival & 0xff) });
+  void send_data(uint32_t can_id, int32_t value) {
+    if (this->inferred_data_len == 1) {
+      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)value });
+      this->canbus->send_data(can_id, true, false, can_data);
+    } else if (this->inferred_data_len == 2) {
+      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) });
+      this->canbus->send_data(can_id, true, false, can_data);
+    } else if (this->inferred_data_len == 4) {
+      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)((value >> 24) & 0xff), (uint8_t)((value >> 16) & 0xff), (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) });
+      this->canbus->send_data(can_id, true, false, can_data);
+    } else {
+      ESP_LOGE(TAG, "Tried to send data with invalid inferred length %d", this->inferred_data_len);
+    }
   }
 
 protected:
   uint32_t can_recv_id;
   uint32_t can_poll_id;
   uint32_t poll_interval;
+  uint8_t inferred_data_len = 0;
   bool is_polling = false;
   float value_factor = 1;
   canbus::Canbus *canbus;

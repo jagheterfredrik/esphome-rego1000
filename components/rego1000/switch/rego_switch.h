@@ -13,7 +13,7 @@ public:
     this->publish_state(value != 0.);
   }
   void write_state(bool state) override {
-    this->canbus->send_data(this->can_poll_id, true, false, std::vector<uint8_t>({static_cast<uint8_t>(state)}));
+    this->send_data(this->can_poll_id, state);
     this->publish_state(state);
   }
 };

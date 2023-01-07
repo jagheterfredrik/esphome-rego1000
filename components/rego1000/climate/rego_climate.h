@@ -42,17 +42,17 @@ public:
     if (this->indoor_sensor->has_state()) {
       this->current_temperature = this->indoor_sensor->state;
       this->publish_state();
-      int16_t indoor_temp = static_cast<uint16_t>(this->current_temperature / this->value_factor);
-      this->canbus->send_data(INDOOR_THERMOSTAT_DIAL_CAN_ID, true, false, value_to_can_data(INDOOR_THERMOSTAT_DIAL_MIDPOINT));
-      this->canbus->send_data(INDOOR_THERMOSTAT_TEMP_CAN_ID, true, false, value_to_can_data(indoor_temp));
+      int32_t indoor_temp = this->current_temperature * 10;
+      this->send_data(INDOOR_THERMOSTAT_DIAL_CAN_ID, INDOOR_THERMOSTAT_DIAL_MIDPOINT);
+      this->send_data(INDOOR_THERMOSTAT_TEMP_CAN_ID, indoor_temp);
     }
   }
   void control(const ClimateCall &call) override {
     if (call.get_target_temperature().has_value()) {
       this->target_temperature = *call.get_target_temperature();
       this->publish_state();
-      int16_t indoor_setpoint = static_cast<uint16_t>(this->target_temperature / this->value_factor);
-      this->canbus->send_data(this->can_poll_id, true, false, value_to_can_data(indoor_setpoint));
+      int32_t indoor_setpoint = this->target_temperature * 10;
+      this->send_data(this->can_poll_id, indoor_setpoint);
     }
   }
 protected:
