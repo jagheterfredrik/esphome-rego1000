@@ -183,12 +183,6 @@ number:
   min_value: 0
   max_value: 6
   step: 1
-- platform: rego1000
-  name: "Admin access num"
-  rego_variable: 0x0001
-  min_value: 0
-  max_value: 200
-  step: 1
 
 switch:
 - platform: rego1000

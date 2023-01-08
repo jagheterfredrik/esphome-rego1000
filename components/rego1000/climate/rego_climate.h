@@ -31,7 +31,7 @@ public:
   }
 
   virtual void publish(float value) override {
-    this->target_temperature = value;
+    this->target_temperature = value / 10.;
     this->publish_state();
   }
   void set_indoor_sensor(sensor::Sensor *indoor_sensor) {
