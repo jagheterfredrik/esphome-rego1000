@@ -18,7 +18,7 @@ class CanbusTriggerProxy : public canbus::CanbusTrigger, Automation<std::vector<
     CanCallbackInterface *callback;
 public:
     CanbusTriggerProxy(canbus::Canbus *canbus, uint32_t can_id, CanCallbackInterface *callback) : CanbusTrigger(canbus, can_id, 0x1fffffff, true), Automation(this), callback(callback) {
-        this->add_action(this);
+        this->add_actions({this});
     }
     virtual void play(std::vector<uint8_t> data, uint32_t can_id, bool rtr) override {
         this->callback->data_recv(data, can_id);
