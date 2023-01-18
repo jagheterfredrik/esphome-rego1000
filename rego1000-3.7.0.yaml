@@ -1,0 +1,211 @@
+esphome:
+  name: heatpump-logger
+
+esp32:
+  board: nodemcu-32s
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "esp-rego1000"
+    password: !secret fallback_password
+
+logger:
+  level: INFO
+  baud_rate: 0
+
+web_server:
+  port: 80
+  include_internal: true
+  local: true
+  auth:
+    username: !secret web_user
+    password: !secret web_password
+
+api:
+  password: !secret hass_api_password
+
+ota:
+  password: !secret ota_password
+
+external_components:
+  - source: components
+
+canbus:
+  - platform: esp32_can
+    id: can0
+    can_id: 0
+    tx_pin: GPIO23
+    rx_pin: GPIO22
+    bit_rate: 125kbps
+
+climate:
+  - platform: rego1000
+    name: House
+    rego_setpoint_variable: 0x08C9 #//0x0656
+    sensor_id: indoor_temp
+
+sensor:
+  - platform: homeassistant
+    entity_id: sensor.indoor_temperature
+    id: indoor_temp
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heat Carrier 1
+    rego_variable: 0x02F9 #//0x022C
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Outdoor
+    rego_variable: 0x0301 #//0x0230
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Warm water
+    rego_variable: 0x030A #//0x0237
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Hot gas
+    rego_variable: 0x032B #0x033C #//0x0250
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heat fluid out
+    rego_variable: 0x0356 #//0x026D
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heat fluid in
+    rego_variable: 0x0360 #//0x0275
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Cold fluid in
+    rego_variable: 0x02DF #//0x0212
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Cold fluid out
+    rego_variable: 0x02ED #//0x0220
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heating start
+    rego_variable: 0x03E1 #//0x02F6
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heating stop
+    rego_variable: 0x03E6 #//0x02FB
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Heating setpoint
+    rego_variable: 0x03DF #//0x02F4
+    value_factor: .1
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+  - platform: rego1000
+    name: Energy output
+    rego_variable: 0x0992 #//0x0714
+    value_factor: .01
+    unit_of_measurement: kWh
+    state_class: "total_increasing"
+    device_class: "energy"
+    accuracy_decimals: 2
+
+binary_sensor:
+- platform: rego1000
+  name: "Heat carrier pump"
+  rego_listen_can_id: 0x00028270
+- platform: rego1000
+  name: "Heat fluid pump"
+  rego_listen_can_id: 0x0002c270
+- platform: rego1000
+  name: "Three-way valve"
+  rego_listen_can_id: 0x00038270
+- platform: rego1000
+  name: "Additional heat"
+  rego_listen_can_id: 0x0003c270
+- platform: rego1000
+  name: "Compressor"
+  rego_listen_can_id: 0x00048270
+- platform: rego1000
+  name: "Cold fluid pump"
+  rego_listen_can_id: 0x00054270
+
+number:
+- platform: rego1000
+  name: Hysterisis min
+  rego_variable: 0x036E #//0x0283
+  unit_of_measurement: °C
+  min_value: 2
+  max_value: 30
+  step: .1
+  value_factor: .1
+- platform: rego1000
+  name: Hysterisis max
+  rego_variable: 0x036A #//0x027F
+  unit_of_measurement: °C
+  min_value: 2
+  max_value: 30
+  step: .1
+  value_factor: .1
+- platform: rego1000
+  name: Hysterisis time factor
+  rego_variable: 0x0366 #//0x027B
+  min_value: 10
+  max_value: 30
+  step: 1
+  value_factor: .1
+- platform: rego1000
+  name: Room dial range
+  rego_variable: 0x0882 #//0x0611
+  min_value: 0
+  max_value: 6
+  step: 1
+- platform: rego1000
+  name: Room dial global
+  rego_variable: 0x0883 
+  min_value: 0
+  max_value: 6
+  step: 1
+
+switch:
+- platform: rego1000
+  name: "Heating disabled EXT2"
+  rego_variable: 0x042E #HW_E21_EXT_2
+- platform: rego1000
+  name: "DHW disabled EXT1"
+  rego_variable: 0x042C #HW_E21_EXT_1
+- platform: rego1000
+  name: "DHW Economy"
+  rego_variable: 0x024B #//0x01A0
+- platform: rego1000
+  name: "Admin access"
+  rego_variable: 0x0001
