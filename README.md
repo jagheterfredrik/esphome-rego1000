@@ -11,6 +11,12 @@ ESPHome component for Rego 1000 heat pump controller, found in:
 * Act as an IVT indoor sensor using the tempeature from a home assistant integrated temperature sensor
 * Set any heat pump variable, e.g. hysterisis, admin access, hot water eco/comfort mode
 
+### Installation
+Make changes to secrets and CAN bus pins in rego1000.yaml, then install it on the ESP32 using
+```bash
+esphome run rego1000-<version>.yaml
+```
+
 ### Connection
 ![Connection overview](connection_overview.jpg)
 ![Connection](connection.jpg)

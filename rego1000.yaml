@@ -39,7 +39,7 @@ canbus:
 climate:
   - platform: rego1000
     name: House
-    rego_setpoint_variable: 0x0656
+    rego_setpoint_variable: $ROOM_SETPOINT_BASE_TEMP
     sensor_id: indoor_temp
 
 sensor:
@@ -49,84 +49,84 @@ sensor:
     accuracy_decimals: 1
   - platform: rego1000
     name: Heat Carrier 1
-    rego_variable: 0x022C
+    rego_variable: $GT1_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Outdoor
-    rego_variable: 0x0230
+    rego_variable: $GT2_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Warm water
-    rego_variable: 0x0237
+    rego_variable: $GT3_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Hot gas
-    rego_variable: 0x0250
+    rego_variable: $GT6_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Heat fluid out
-    rego_variable: 0x026D
+    rego_variable: $GT8_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Heat fluid in
-    rego_variable: 0x0275
+    rego_variable: $GT9_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Cold fluid in
-    rego_variable: 0x0212
+    rego_variable: $GT10_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Cold fluid out
-    rego_variable: 0x0220
+    rego_variable: $GT11_TEMP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Heating start
-    rego_variable: 0x02F6
+    rego_variable: $HEATING_START
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Heating stop
-    rego_variable: 0x02FB
+    rego_variable: $HEATING_STOP
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Heating setpoint
-    rego_variable: 0x02F4
+    rego_variable: $HEATING_SETPOINT
     value_factor: .1
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
   - platform: rego1000
     name: Energy output
-    rego_variable: 0x0714
+    rego_variable: $STATS_ENERGY_OUTPUT
     value_factor: .01
     unit_of_measurement: kWh
     state_class: "total_increasing"
@@ -136,27 +136,27 @@ sensor:
 binary_sensor:
 - platform: rego1000
   name: "Heat carrier pump"
-  rego_listen_can_id: 0x00028260
+  rego_listen_can_id: 0x00028${REGO_CAN_SUFFIX}
 - platform: rego1000
   name: "Heat fluid pump"
-  rego_listen_can_id: 0x0002c260
+  rego_listen_can_id: 0x0002c${REGO_CAN_SUFFIX}
 - platform: rego1000
   name: "Three-way valve"
-  rego_listen_can_id: 0x00038260
+  rego_listen_can_id: 0x00038${REGO_CAN_SUFFIX}
 - platform: rego1000
   name: "Additional heat"
-  rego_listen_can_id: 0x0003c260
+  rego_listen_can_id: 0x0003c${REGO_CAN_SUFFIX}
 - platform: rego1000
   name: "Compressor"
-  rego_listen_can_id: 0x00048260
+  rego_listen_can_id: 0x00048${REGO_CAN_SUFFIX}
 - platform: rego1000
   name: "Cold fluid pump"
-  rego_listen_can_id: 0x00054260
+  rego_listen_can_id: 0x00054${REGO_CAN_SUFFIX}
 
 number:
 - platform: rego1000
   name: Hysterisis min
-  rego_variable: 0x0283
+  rego_variable: $HEATING_1A_DIFF_MIN
   unit_of_measurement: °C
   min_value: 2
   max_value: 30
@@ -164,7 +164,7 @@ number:
   value_factor: .1
 - platform: rego1000
   name: Hysterisis max
-  rego_variable: 0x027F
+  rego_variable: $HEATING_1A_DIFF_MAX
   unit_of_measurement: °C
   min_value: 2
   max_value: 30
@@ -172,14 +172,14 @@ number:
   value_factor: .1
 - platform: rego1000
   name: Hysterisis time factor
-  rego_variable: 0x027B
+  rego_variable: $HEATING_1A_DIFF_CONST
   min_value: 10
   max_value: 30
   step: 1
   value_factor: .1
 - platform: rego1000
   name: Room dial range
-  rego_variable: 0x0611
+  rego_variable: $ROOM_DIAL_RANGE
   min_value: 0
   max_value: 6
   step: 1
@@ -187,7 +187,7 @@ number:
 switch:
 - platform: rego1000
   name: "DHW Economy"
-  rego_variable: 0x01A0
+  rego_variable: $DHW_STATE_ECONOMY
 - platform: rego1000
   name: "Admin access"
-  rego_variable: 0x0001
+  rego_variable: $ACCESS_LEVEL
