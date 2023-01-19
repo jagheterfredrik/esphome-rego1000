@@ -6,9 +6,6 @@ esp32:
   framework:
     type: arduino
 
-substitutions: !include
-  file: $rego_version
-
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
