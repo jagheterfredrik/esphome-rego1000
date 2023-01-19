@@ -7,7 +7,7 @@ esp32:
     type: arduino
 
 substitutions: !include
-  file: rego1000-v${rego_version}-variables.yaml
+  file: $rego_version
 
 wifi:
   ssid: !secret wifi_ssid
