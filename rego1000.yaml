@@ -6,6 +6,9 @@ esp32:
   framework:
     type: arduino
 
+substitutions:
+  <<: !include rego1000-v${rego_version}-variables.yaml
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -190,4 +193,4 @@ switch:
   rego_variable: 0x01A0
 - platform: rego1000
   name: "Admin access"
-  rego_variable: 0x0001
+  rego_variable: $ACCESS_LEVEL
