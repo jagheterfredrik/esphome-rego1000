@@ -1409,4 +1409,4 @@ substitutions:
   "TIMER_CIRCULATION_E22_G2_TEMPORARY_STOP": 0x0804
   "TIMER_COMMUNICATION_BAD_CANBUS_REBOOT_DELAY": 0x0805
 
-!include rego1000.yaml
+<<: !include rego1000.yaml
