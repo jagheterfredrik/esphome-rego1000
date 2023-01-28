@@ -26,8 +26,6 @@ ota:
 external_components:
   - source: components
 
-web_server:
-
 canbus:
   - platform: esp32_can
     id: can0
@@ -40,12 +38,17 @@ climate:
   - platform: rego1000
     name: House
     rego_setpoint_variable: $ROOM_SETPOINT_BASE_TEMP
-    sensor_id: indoor_temp
+    sensor_id: indoor_temperature
+    offset_heat_id: indoor_heat_offset
 
 sensor:
   - platform: homeassistant
     entity_id: sensor.indoor_temperature
-    id: indoor_temp
+    id: indoor_temperature
+    accuracy_decimals: 1
+  - platform: homeassistant
+    entity_id: input_number.indoor_heat_offset
+    id: indoor_heat_offset
     accuracy_decimals: 1
   - platform: rego1000
     name: Heat Carrier 1
@@ -183,6 +186,13 @@ number:
   min_value: 0
   max_value: 6
   step: 1
+- platform: rego1000
+  name: Room influence
+  rego_variable: 0x0627
+  min_value: 0
+  max_value: 10
+  step: .1
+  value_factor: .1
 
 switch:
 - platform: rego1000

@@ -17,6 +17,7 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
         cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
         cv.Required("rego_setpoint_variable"): cv.int_,
         cv.Optional(CONF_SENSOR_ID): cv.use_id(Sensor),
+        cv.Optional("offset_heat_id"): cv.use_id(Sensor),
         cv.Optional("poll_interval", default="10s"): cv.update_interval,
     }
 )
@@ -34,4 +35,7 @@ async def to_code(config):
     if CONF_SENSOR_ID in config:
         indoor_sensor = await cg.get_variable(config[CONF_SENSOR_ID])
         cg.add(var.set_indoor_sensor(indoor_sensor))
+    if "offset_heat_id" in config:
+        offset_heat_sensor = await cg.get_variable(config["offset_heat_id"])
+        cg.add(var.set_offset_heat_sensor(offset_heat_sensor))
 

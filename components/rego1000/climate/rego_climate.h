@@ -5,6 +5,8 @@
 
 #define INDOOR_THERMOSTAT_TEMP_CAN_ID 0x10000060
 #define INDOOR_THERMOSTAT_DIAL_CAN_ID 0x10004060
+// The indoor heat offset is centered around 512 (i.e. for 0 offset), with a deadband 500 - 524.
+// With maximum room dial range (6), the lowest (-3) is reached at 150, the highest (+3) at 874.
 #define INDOOR_THERMOSTAT_DIAL_MIDPOINT 0x200
 
 using namespace esphome;
@@ -38,12 +40,19 @@ public:
     this->indoor_sensor = indoor_sensor;
     this->set_interval("update_indoor_temperature", 5000, [this]() { this->update_indoor_temperature(); });
   }
+  void set_offset_heat_sensor(sensor::Sensor *offset_heat_sensor) {
+    this->offset_heat_sensor = offset_heat_sensor;
+  }
   void update_indoor_temperature() {
     if (this->indoor_sensor->has_state()) {
       this->current_temperature = this->indoor_sensor->state;
       this->publish_state();
       int32_t indoor_temp = this->current_temperature * 10;
-      this->send_data(INDOOR_THERMOSTAT_DIAL_CAN_ID, INDOOR_THERMOSTAT_DIAL_MIDPOINT);
+      int32_t heat_offset = INDOOR_THERMOSTAT_DIAL_MIDPOINT;
+      if (this->offset_heat_sensor && this->offset_heat_sensor->has_state()) {
+        heat_offset = this->offset_heat_sensor->state;
+      }
+      this->send_data(INDOOR_THERMOSTAT_DIAL_CAN_ID, heat_offset);
       this->send_data(INDOOR_THERMOSTAT_TEMP_CAN_ID, indoor_temp);
     }
   }
@@ -57,6 +66,7 @@ public:
   }
 protected:
   sensor::Sensor *indoor_sensor;
+  sensor::Sensor *offset_heat_sensor;
 };
 
 }
