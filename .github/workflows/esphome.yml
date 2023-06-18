@@ -25,3 +25,4 @@ jobs:
         esphome compile rego1000-v1.12.1.yaml
         esphome compile rego1000-v3.6.0.yaml
         esphome compile rego1000-v3.7.0.yaml
+        esphome compile rego1000-v3.9.0.yaml
