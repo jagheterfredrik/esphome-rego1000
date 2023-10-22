@@ -31,9 +31,16 @@ api:
 ota:
   password: !secret ota_password
 
+canbus:
+  - platform: esp32_can
+    id: can0
+    can_id: 0
+    tx_pin: GPIO23
+    rx_pin: GPIO22
+    bit_rate: 125kbps
 
 custom_component:
   - id: rego_sensor
     lambda: |-
-      RegoReader* rego_sensor = rego_sensor->getInstance();
+      RegoReader* rego_sensor = rego_sensor->getInstance(id(can0));
       return {rego_sensor};
