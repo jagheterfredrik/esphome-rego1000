@@ -88,8 +88,8 @@ class RegoReader : public Component, public CanCallbackInterface {
         std::vector<uint8_t> can_data = std::vector<uint8_t>({
           (uint8_t)0x00,
           (uint8_t)0x00,
-          (uint8_t)0x4E,
-          (uint8_t)0x20,
+          (uint8_t)0x08,
+          (uint8_t)0x00,
           (uint8_t) ((remote_rd_ptr >> 24) & 0xff),
           (uint8_t) ((remote_rd_ptr >> 16) & 0xff),
           (uint8_t) ((remote_rd_ptr >> 8) & 0xff),
@@ -99,7 +99,7 @@ class RegoReader : public Component, public CanCallbackInterface {
         ++state;
       } else if (state == 2) { // Request read
         this->canbus->send_data(0x01FDBFE0, true, true, std::vector<uint8_t>());
-        remote_rd_ptr += 0x4E20;
+        remote_rd_ptr += 0x800;
         state = 0xff;
       } else if (state == 3 || state == 4) { // Parse data
         uint8_t *parse_ptr = buf;
@@ -113,8 +113,6 @@ class RegoReader : public Component, public CanCallbackInterface {
 
           parse_ptr += hdr->name_length;
         }
-        // Add delay to allow for UART over WiFi to not choke
-        delay(50);
 
         leftover = buf_ptr - parse_ptr;
         if (leftover > 0) {
@@ -138,7 +136,7 @@ class RegoReader : public Component, public CanCallbackInterface {
       if ((buf_ptr - buf) % 0x500 == 0)
         ESP_LOGD(TAG, "read %d", buf_ptr - buf);
 
-      if (buf_ptr - buf >= 0x4e20 + leftover) { // Read all data
+      if (buf_ptr - buf >= 0x800 + leftover) { // Read all data
         state = 3;
       }
       if (can_id == 0x09FDFFE0) { //No more data
