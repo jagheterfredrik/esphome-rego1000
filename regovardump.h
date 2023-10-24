@@ -1,8 +1,5 @@
 #include "esphome.h"
 
-#include "driver/gpio.h"
-#include "driver/can.h"
-
 static const char* TAG = "RegoReader";
 
 static const unsigned int MAX_READ_SIZE = 0x5000;
@@ -15,12 +12,29 @@ typedef struct __attribute__((__packed__)) RegoVariableHeader {
   uint8_t name_length;
 } rego_hdr;
 
-class RegoReader : public Component {
+class CanCallbackInterface
+{
+  public:
+  virtual void data_recv(std::vector<uint8_t>, uint32_t) = 0;
+};
+
+class CanbusTriggerProxy : public canbus::CanbusTrigger, Automation<std::vector<uint8_t>, uint32_t, bool>, Action<std::vector<uint8_t>, uint32_t, bool> {
+    CanCallbackInterface *callback;
+public:
+    CanbusTriggerProxy(canbus::Canbus *canbus, CanCallbackInterface *callback) : CanbusTrigger(canbus, 0, 0, true), Automation(this), callback(callback) {
+        this->add_actions({this});
+    }
+    virtual void play(std::vector<uint8_t> data, uint32_t can_id, bool rtr) override {
+        this->callback->data_recv(data, can_id);
+    }
+};
+
+class RegoReader : public Component, public CanCallbackInterface {
   protected:
     static RegoReader *instance;
 
-    gpio_num_t tx;
-    gpio_num_t rx;
+    canbus::Canbus *canbus;
+    canbus::CanbusTrigger *can_trigger;
 
     uint8_t *buf;
     uint8_t *buf_ptr;
@@ -32,7 +46,7 @@ class RegoReader : public Component {
     uint8_t ctr = 0;
     unsigned long cooldown;
 
-    RegoReader(gpio_num_t tx, gpio_num_t rx): tx(tx), rx(rx) {
+    RegoReader(canbus::Canbus *canbus): canbus(canbus) {
       buf = (uint8_t*) malloc(MAX_READ_SIZE);
       buf_ptr = buf;
     }
@@ -46,46 +60,16 @@ class RegoReader : public Component {
   public:
     unsigned long state = 0;
     
-    static RegoReader *getInstance() {
+    static RegoReader *getInstance(canbus::Canbus *canbus) {
       if (!instance) {
-        instance = new RegoReader(GPIO_NUM_23, GPIO_NUM_22);
+        instance = new RegoReader(canbus);
       }
       return instance;
     }
-    
 
     void setup() {
-      //Initialize configuration structures using macro initializers
-      can_general_config_t g_config = CAN_GENERAL_CONFIG_DEFAULT(this->tx, this->rx, CAN_MODE_NORMAL);
-      g_config.rx_queue_len = 60;
-      g_config.tx_queue_len = 60;
-      can_timing_config_t t_config = CAN_TIMING_CONFIG_125KBITS();
-      can_filter_config_t f_config = CAN_FILTER_CONFIG_ACCEPT_ALL();
-
-      //Install CAN driver
-      if (can_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
-        ESP_LOGD(TAG, "Driver installed\n");
-      } else {
-        ESP_LOGD(TAG, "Failed to install driver\n");
-        return;
-      }
-
-      //Start CAN driver
-      if (can_start() == ESP_OK) {
-        ESP_LOGD(TAG, "Driver started\n");
-      } else {
-        ESP_LOGD(TAG, "Failed to start driver\n");
-        return;
-      }
-    }
-
-    void dump_message(can_message_t message) {
-      char dumpbuf[64];
-      char *dumpbufp = dumpbuf;
-      for (int i=0; i<message.data_length_code; ++i) {
-        dumpbufp += sprintf(dumpbufp, " %.2X", message.data[i]);
-      }
-      ESP_LOGD(TAG, "%08X (%d):%s", message.identifier, message.data_length_code, dumpbuf);
+      this->can_trigger = new CanbusTriggerProxy(this->canbus, this);
+      this->can_trigger->setup();
     }
 
     void loop() {
@@ -101,37 +85,22 @@ class RegoReader : public Component {
       }
       if (state == 1) { // Set read addr
         buf_ptr = &buf[leftover];
-
-        can_message_t out_message;
-        out_message.flags = CAN_MSG_FLAG_EXTD;
-        out_message.identifier = 0x01FD3FE0; // read ptr
-        out_message.data_length_code = 8;
-        out_message.data[0] = 0x00;
-        out_message.data[1] = 0x00;
-        out_message.data[2] = 0x4E;
-        out_message.data[3] = 0x20;
-        out_message.data[4] = (remote_rd_ptr >> 24) & 0xff;
-        out_message.data[5] = (remote_rd_ptr >> 16) & 0xff;
-        out_message.data[6] = (remote_rd_ptr >> 8) & 0xff;
-        out_message.data[7] = remote_rd_ptr & 0xff;
-        if (can_transmit(&out_message, pdMS_TO_TICKS(1000)) == ESP_OK) {
-          ESP_LOGD(TAG, "Read ptr set QUEUED");
-          ++state;
-        } else {
-          ESP_LOGD(TAG, "Read ptr set FAILED");
-        }
+        std::vector<uint8_t> can_data = std::vector<uint8_t>({
+          (uint8_t)0x00,
+          (uint8_t)0x00,
+          (uint8_t)0x4E,
+          (uint8_t)0x20,
+          (uint8_t) ((remote_rd_ptr >> 24) & 0xff),
+          (uint8_t) ((remote_rd_ptr >> 16) & 0xff),
+          (uint8_t) ((remote_rd_ptr >> 8) & 0xff),
+          (uint8_t) (remote_rd_ptr & 0xff)
+        });
+        this->canbus->send_data(0x01FD3FE0, true, false, can_data);
+        ++state;
       } else if (state == 2) { // Request read
-        can_message_t out_message;
-        out_message.flags = CAN_MSG_FLAG_RTR | CAN_MSG_FLAG_EXTD;
-        out_message.identifier = 0x01FDBFE0; // read cmd
-        out_message.data_length_code = 0;
-        if (can_transmit(&out_message, pdMS_TO_TICKS(1000)) == ESP_OK) {
-          ESP_LOGD(TAG, "Read request QUEUED");
-          remote_rd_ptr += 0x4E20;
-          state = 0xff;
-        } else {
-          ESP_LOGD(TAG, "Read request FAILED");
-        }
+        this->canbus->send_data(0x01FDBFE0, true, true, std::vector<uint8_t>());
+        remote_rd_ptr += 0x4E20;
+        state = 0xff;
       } else if (state == 3 || state == 4) { // Parse data
         uint8_t *parse_ptr = buf;
         while(1) {
@@ -144,6 +113,8 @@ class RegoReader : public Component {
 
           parse_ptr += hdr->name_length;
         }
+        // Add delay to allow for UART over WiFi to not choke
+        delay(50);
 
         leftover = buf_ptr - parse_ptr;
         if (leftover > 0) {
@@ -154,29 +125,28 @@ class RegoReader : public Component {
         else
           state = 0xff;
       }
+  }
 
-      can_message_t message;
-      while (can_receive(&message, 0U) == ESP_OK) {
-        if (message.identifier == 0x09FDBFE0 || message.identifier == 0x09FDFFE0) {
-          // 0x09FDBFE0 - More data available
-          // 0x09FDFFE0 - No more data available
-          
-          memcpy(buf_ptr, message.data, message.data_length_code);
-          buf_ptr += message.data_length_code;
+  virtual void data_recv(std::vector<uint8_t> data, uint32_t can_id) {
+    if (can_id == 0x09FDBFE0 || can_id == 0x09FDFFE0) {
+      // 0x09FDBFE0 - More data available
+      // 0x09FDFFE0 - No more data available
+      
+      memcpy(buf_ptr, data.data(), data.size());
+      buf_ptr += data.size();
 
-          if ((buf_ptr - buf) % 0x500 == 0)
-            ESP_LOGD(TAG, "read %d", buf_ptr - buf);
+      if ((buf_ptr - buf) % 0x500 == 0)
+        ESP_LOGI(TAG, "read %d", buf_ptr - buf);
 
-          if (buf_ptr - buf >= 0x4e20 + leftover) { // Read all data
-            state = 3;
-          }
-          if (message.identifier == 0x09FDFFE0) { //No more data
-            state = 4;
-            ESP_LOGD(TAG, "Got end of data flag");
-          }
-        }
+      if (buf_ptr - buf >= 0x4e20 + leftover) { // Read all data
+        state = 3;
+      }
+      if (can_id == 0x09FDFFE0) { //No more data
+        state = 4;
+        ESP_LOGD(TAG, "Got end of data flag");
       }
     }
+  }
 
 };
 
