@@ -136,7 +136,7 @@ class RegoReader : public Component, public CanCallbackInterface {
       buf_ptr += data.size();
 
       if ((buf_ptr - buf) % 0x500 == 0)
-        ESP_LOGD(TAG, "read %d", buf_ptr - buf);
+        ESP_LOGI(TAG, "read %d", buf_ptr - buf);
 
       if (buf_ptr - buf >= 0x4e20 + leftover) { // Read all data
         state = 3;
