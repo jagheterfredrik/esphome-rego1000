@@ -4,20 +4,20 @@ esphome:
     - regovardump.h
 
 esp32:
-  board: nodemcu-32s
+  board: esp32-evb
   framework:
     type: arduino
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "esp-rego1000"
-    password: !secret fallback_password
-
-captive_portal:
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  manual_ip:
+    static_ip: 192.168.0.21
+    gateway: 192.168.0.1
+    subnet: 255.255.255.0
 
 # Enable logging
 logger:
@@ -26,7 +26,8 @@ logger:
   
 # Enable Home Assistant API
 api:
-  password: !secret hass_api_password
+  encryption:
+    key: !secret ha_api_encryption_key
 
 ota:
   password: !secret ota_password

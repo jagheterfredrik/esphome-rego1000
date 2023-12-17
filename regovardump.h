@@ -48,7 +48,7 @@ class RegoReader : public Component {
     
     static RegoReader *getInstance() {
       if (!instance) {
-        instance = new RegoReader(GPIO_NUM_23, GPIO_NUM_22);
+        instance = new RegoReader(GPIO_NUM_5, GPIO_NUM_35);
       }
       return instance;
     }
