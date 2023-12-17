@@ -133,25 +133,25 @@ sensor:
   #   device_class: "energy"
   #   accuracy_decimals: 2
 
-# binary_sensor:
-# - platform: rego1000
-#   name: "Heat carrier pump"
-#   rego_listen_can_id: 0x00028${REGO_CAN_SUFFIX}
-# - platform: rego1000
-#   name: "Heat fluid pump"
-#   rego_listen_can_id: 0x0002c${REGO_CAN_SUFFIX}
-# - platform: rego1000
-#   name: "Three-way valve"
-#   rego_listen_can_id: 0x00038${REGO_CAN_SUFFIX}
-# - platform: rego1000
-#   name: "Additional heat"
-#   rego_listen_can_id: 0x0003c${REGO_CAN_SUFFIX}
-# - platform: rego1000
-#   name: "Compressor"
-#   rego_listen_can_id: 0x00048${REGO_CAN_SUFFIX}
-# - platform: rego1000
-#   name: "Cold fluid pump"
-#   rego_listen_can_id: 0x00054${REGO_CAN_SUFFIX}
+binary_sensor:
+- platform: rego1000
+  name: "Heat carrier pump"
+  rego_listen_can_id: 0x00028${REGO_CAN_SUFFIX}
+- platform: rego1000
+  name: "Heat fluid pump"
+  rego_listen_can_id: 0x0002c${REGO_CAN_SUFFIX}
+- platform: rego1000
+  name: "Three-way valve"
+  rego_listen_can_id: 0x00038${REGO_CAN_SUFFIX}
+- platform: rego1000
+  name: "Additional heat"
+  rego_listen_can_id: 0x0003c${REGO_CAN_SUFFIX}
+- platform: rego1000
+  name: "Compressor"
+  rego_listen_can_id: 0x00048${REGO_CAN_SUFFIX}
+- platform: rego1000
+  name: "Cold fluid pump"
+  rego_listen_can_id: 0x00054${REGO_CAN_SUFFIX}
 
 number:
 - platform: rego1000
