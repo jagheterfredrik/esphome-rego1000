@@ -124,14 +124,14 @@ sensor:
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
-  - platform: rego1000
-    name: Energy output
-    rego_variable: $STATS_ENERGY_OUTPUT
-    value_factor: .01
-    unit_of_measurement: kWh
-    state_class: "total_increasing"
-    device_class: "energy"
-    accuracy_decimals: 2
+  # - platform: rego1000
+  #   name: Energy output
+  #   rego_variable: $STATS_ENERGY_OUTPUT
+  #   value_factor: .01
+  #   unit_of_measurement: kWh
+  #   state_class: "total_increasing"
+  #   device_class: "energy"
+  #   accuracy_decimals: 2
 
 binary_sensor:
 - platform: rego1000
