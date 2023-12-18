@@ -168,9 +168,9 @@ sensor:
   #   lambda: |-
   #     return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * $COMPRESSOR_POWER;
   #   update_interval: 60s
-  # - platform: rego1000
-
-  # Sensor for energy consumed by additional heating
+  
+# Sensor for energy consumed by additional heating
+  - platform: rego1000
     id: energy_consumption_add_heating
     name: Energy consumption add heating
     rego_variable: $STATS_ELECTR_ADD_HEATING
