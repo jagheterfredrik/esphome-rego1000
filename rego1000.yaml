@@ -158,17 +158,17 @@ sensor:
     accuracy_decimals: 2
 
   # If this calculated sensor is used the COMPRESSOR_POWER should be set in the rego1000-vx.x.x.yaml file
-  - platform: template
-    id: energy_consumption_compressor
-    name: Energy consumption compressor
-    unit_of_measurement: kWh
-    state_class: "total_increasing"
-    device_class: "energy"
-    accuracy_decimals: 2
-    lambda: |-
-      return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * $COMPRESSOR_POWER;
-    update_interval: 60s
-  - platform: rego1000
+  # - platform: template
+  #   id: energy_consumption_compressor
+  #   name: Energy consumption compressor
+  #   unit_of_measurement: kWh
+  #   state_class: "total_increasing"
+  #   device_class: "energy"
+  #   accuracy_decimals: 2
+  #   lambda: |-
+  #     return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * $COMPRESSOR_POWER;
+  #   update_interval: 60s
+  # - platform: rego1000
 
   # Sensor for energy consumed by additional heating
     id: energy_consumption_add_heating
