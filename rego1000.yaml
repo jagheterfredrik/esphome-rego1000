@@ -162,6 +162,8 @@ sensor:
     filters:
     - lambda: return x / 3600.0;
     accuracy_decimals: 2
+
+  # If this calculated sensor is used the COMPRESSOR_POWER should be set in the rego1000-vx.x.x.yaml file
   - platform: template
     id: energy_consumption_compressor
     name: Energy consumption compressor
@@ -170,7 +172,7 @@ sensor:
     device_class: "energy"
     accuracy_decimals: 2
     lambda: |-
-      return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * 2.3;
+      return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * $COMPRESSOR_POWER;
     update_interval: 60s
   - platform: rego1000
 
