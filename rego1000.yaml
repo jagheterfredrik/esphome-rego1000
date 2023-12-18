@@ -124,6 +124,8 @@ sensor:
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
+  
+  # The variable used for the sensor below is supported in Rego1000 v3.9.0 but has been removed in v3.14.0
   # - platform: rego1000
   #   name: Energy output
   #   rego_variable: $STATS_ENERGY_OUTPUT
@@ -132,6 +134,71 @@ sensor:
   #   state_class: "total_increasing"
   #   device_class: "energy"
   #   accuracy_decimals: 2
+
+  # Sensor for compressor operational time and estimated consumed energy
+  - platform: rego1000
+    id: op_time_compressor_heating
+    name: OpTime compressor heating
+    rego_variable: $STATS_COMPRESSOR_HEATING
+    unit_of_measurement: h
+    state_class: "total_increasing"
+    device_class: "duration"
+    filters:
+    - lambda: return x / 3600.0;
+    accuracy_decimals: 2
+  - platform: rego1000
+    id: op_time_compressor_dwh
+    name: OpTime compressor dhw
+    rego_variable: $STATS_COMPRESSOR_DHW
+    unit_of_measurement: h
+    state_class: "total_increasing"
+    device_class: "duration"
+    filters:
+    - lambda: return x / 3600.0;
+    accuracy_decimals: 2
+
+  # If this calculated sensor is used the COMPRESSOR_POWER should be set in the rego1000-vx.x.x.yaml file
+  # - platform: template
+  #   id: energy_consumption_compressor
+  #   name: Energy consumption compressor
+  #   unit_of_measurement: kWh
+  #   state_class: "total_increasing"
+  #   device_class: "energy"
+  #   accuracy_decimals: 2
+  #   lambda: |-
+  #     return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * $COMPRESSOR_POWER;
+  #   update_interval: 60s
+  
+# Sensor for energy consumed by additional heating
+  - platform: rego1000
+    id: energy_consumption_add_heating
+    name: Energy consumption add heating
+    rego_variable: $STATS_ELECTR_ADD_HEATING
+    value_factor: .001
+    unit_of_measurement: kWh
+    state_class: "total_increasing"
+    device_class: "energy"
+    accuracy_decimals: 2
+  - platform: rego1000
+    id: energy_consumption_add_dhw
+    name: Energy consumption add dhw
+    rego_variable: $STATS_ELECTR_ADD_DHW
+    value_factor: .001
+    unit_of_measurement: kWh
+    state_class: "total_increasing"
+    device_class: "energy"
+    accuracy_decimals: 2
+  - platform: template
+    id: energy_consumption_add
+    name: Energy consumption add
+    unit_of_measurement: kWh
+    state_class: "total_increasing"
+    device_class: "energy"
+    accuracy_decimals: 2
+    lambda: |-
+      return id(energy_consumption_add_heating).state + id(energy_consumption_add_dhw).state;
+    update_interval: 60s
+
 
 binary_sensor:
 - platform: rego1000
