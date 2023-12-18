@@ -130,6 +130,8 @@ sensor:
     unit_of_measurement: °C
     state_class: measurement
     accuracy_decimals: 1
+  
+  # The variable used for the sensor below is supported in Rego1000 v3.9.0 but has been removed in v3.14.0
   # - platform: rego1000
   #   name: Energy output
   #   rego_variable: $STATS_ENERGY_OUTPUT
@@ -138,6 +140,8 @@ sensor:
   #   state_class: "total_increasing"
   #   device_class: "energy"
   #   accuracy_decimals: 2
+
+  # Sensor for compressor operational time and estimated consumed energy
   - platform: rego1000
     id: op_time_compressor_heating
     name: OpTime compressor heating
@@ -169,6 +173,8 @@ sensor:
       return (id(op_time_compressor_heating).state + id(op_time_compressor_dwh).state) * 2.3;
     update_interval: 60s
   - platform: rego1000
+
+  # Sensor for energy consumed by additional heating
     id: energy_consumption_add_heating
     name: Energy consumption add heating
     rego_variable: $STATS_ELECTR_ADD_HEATING
