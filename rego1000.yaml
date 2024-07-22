@@ -20,6 +20,8 @@ logger:
 api:
   password: !secret hass_api_password
 
+# The OTA configuration was changed in esphome 2024.06.
+# For earlier releases the '- platform: esphome' should not be included
 ota:
   - platform: esphome
     password: !secret ota_password
