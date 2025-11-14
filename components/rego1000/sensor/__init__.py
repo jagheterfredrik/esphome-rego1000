@@ -10,15 +10,18 @@ AUTO_LOAD = ["rego1000", "sensor"]
 rego_ns = cg.esphome_ns.namespace("rego")
 RegoSensor = rego_ns.class_("RegoSensor", sensor.Sensor, cg.Component)
 
-CONFIG_SCHEMA = sensor.SENSOR_SCHEMA.extend( 
-    {
-        cv.GenerateID(): cv.declare_id(RegoSensor),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Exclusive("rego_variable", "rego_can_id"): cv.int_,
-        cv.Exclusive("rego_listen_can_id", "rego_can_id"): cv.int_,
-        cv.Optional("value_factor", default=1.): cv.float_,
-        cv.Optional("poll_interval", default="10s"): cv.update_interval,
-    }
+CONFIG_SCHEMA = (
+    sensor.sensor_schema(RegoSensor)
+    .extend(
+        {
+            cv.GenerateID(): cv.declare_id(RegoSensor),
+            cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+            cv.Exclusive("rego_variable", "rego_can_id"): cv.int_,
+            cv.Exclusive("rego_listen_can_id", "rego_can_id"): cv.int_,
+            cv.Optional("value_factor", default=1.): cv.float_,
+            cv.Optional("poll_interval", default="10s"): cv.update_interval,
+        }
+    )
 )
 
 
