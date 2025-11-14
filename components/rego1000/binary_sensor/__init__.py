@@ -10,14 +10,18 @@ AUTO_LOAD = ["rego1000", "binary_sensor"]
 rego_ns = cg.esphome_ns.namespace("rego")
 RegoSensor = rego_ns.class_("RegoBinarySensor", binary_sensor.BinarySensor, cg.Component)
 
-CONFIG_SCHEMA = binary_sensor.BINARY_SENSOR_SCHEMA.extend( 
-    {
-        cv.GenerateID(): cv.declare_id(RegoSensor),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Exclusive("rego_variable", "rego_can_id"): cv.int_,
-        cv.Exclusive("rego_listen_can_id", "rego_can_id"): cv.int_,
-    }
+CONFIG_SCHEMA = ( 
+    binary_sensor.binary_sensor_schema(RegoSensor)
+    .extend(
+        {
+          cv.GenerateID(): cv.declare_id(RegoSensor),
+          cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+          cv.Exclusive("rego_variable", "rego_can_id"): cv.int_,
+          cv.Exclusive("rego_listen_can_id", "rego_can_id"): cv.int_,
+        }
+    )
 )
+
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
