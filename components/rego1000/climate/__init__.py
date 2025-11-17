@@ -11,14 +11,17 @@ AUTO_LOAD = ["rego1000", "climate"]
 rego_ns = cg.esphome_ns.namespace("rego")
 RegoNumber = rego_ns.class_("RegoClimate", climate.Climate, cg.Component)
 
-CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend( 
-    {
-        cv.GenerateID(): cv.declare_id(RegoNumber),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Required("rego_setpoint_variable"): cv.int_,
-        cv.Optional(CONF_SENSOR_ID): cv.use_id(Sensor),
-        cv.Optional("poll_interval", default="10s"): cv.update_interval,
-    }
+CONFIG_SCHEMA = ( 
+    climate.climate_schema(RegoNumber)
+    .extend(
+        {
+            cv.GenerateID(): cv.declare_id(RegoNumber),
+            cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+            cv.Required("rego_setpoint_variable"): cv.int_,
+            cv.Optional(CONF_SENSOR_ID): cv.use_id(Sensor),
+            cv.Optional("poll_interval", default="10s"): cv.update_interval,
+        }
+    )
 )
 
 

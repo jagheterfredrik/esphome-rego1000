@@ -10,13 +10,16 @@ AUTO_LOAD = ["rego1000", "switch"]
 rego_ns = cg.esphome_ns.namespace("rego")
 RegoSwitch = rego_ns.class_("RegoSwitch", switch.Switch, cg.Component)
 
-CONFIG_SCHEMA = switch.SWITCH_SCHEMA.extend( 
-    {
-        cv.GenerateID(): cv.declare_id(RegoSwitch),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Required("rego_variable"): cv.int_,
-        cv.Optional("poll_interval", default="10s"): cv.update_interval,
-    }
+CONFIG_SCHEMA = (
+    switch.switch_schema(RegoSwitch)
+    .extend(
+        {
+            cv.GenerateID(): cv.declare_id(RegoSwitch),
+            cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+            cv.Required("rego_variable"): cv.int_,
+            cv.Optional("poll_interval", default="10s"): cv.update_interval,
+        }
+    )
 )
 
 

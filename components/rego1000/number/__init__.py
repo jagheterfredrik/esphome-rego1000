@@ -10,17 +10,20 @@ AUTO_LOAD = ["rego1000", "number"]
 rego_ns = cg.esphome_ns.namespace("rego")
 RegoNumber = rego_ns.class_("RegoNumber", number.Number, cg.Component)
 
-CONFIG_SCHEMA = number.NUMBER_SCHEMA.extend( 
-    {
-        cv.GenerateID(): cv.declare_id(RegoNumber),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Required("rego_variable"): cv.int_,
-        cv.Required(CONF_MAX_VALUE): cv.float_,
-        cv.Required(CONF_MIN_VALUE): cv.float_,
-        cv.Required(CONF_STEP): cv.positive_float,
-        cv.Optional("value_factor", default=1.): cv.float_,
-        cv.Optional("poll_interval", default="10s"): cv.update_interval,
-    }
+CONFIG_SCHEMA = (
+    number.number_schema(RegoNumber)
+    .extend(
+        {
+            cv.GenerateID(): cv.declare_id(RegoNumber),
+            cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+            cv.Required("rego_variable"): cv.int_,
+            cv.Required(CONF_MAX_VALUE): cv.float_,
+            cv.Required(CONF_MIN_VALUE): cv.float_,
+            cv.Required(CONF_STEP): cv.positive_float,
+            cv.Optional("value_factor", default=1.): cv.float_,
+            cv.Optional("poll_interval", default="10s"): cv.update_interval,
+        }
+    )
 )
 
 
