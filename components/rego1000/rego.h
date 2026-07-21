@@ -14,13 +14,14 @@ class CanCallbackInterface
   virtual void data_recv(std::vector<uint8_t>, uint32_t) = 0;
 };
 
-class CanbusTriggerProxy : public canbus::CanbusTrigger, Automation<std::vector<uint8_t>, uint32_t, bool>, Action<std::vector<uint8_t>, uint32_t, bool> {
+// Using composition instead of inheritance for final class CanbusTrigger
+class CanCallbackAction : public Action<std::vector<uint8_t>, uint32_t, bool> {
     CanCallbackInterface *callback;
 public:
-    CanbusTriggerProxy(canbus::Canbus *canbus, uint32_t can_id, CanCallbackInterface *callback) : CanbusTrigger(canbus, can_id, 0x1fffffff, true), Automation(this), callback(callback) {
-        this->add_actions({this});
-    }
-    virtual void play(const std::vector<uint8_t>& data, const uint32_t& can_id, const bool& rtr) override {
+    CanCallbackAction(CanCallbackInterface *callback) : callback(callback) {}
+
+    // ESPHome's Action template strictly requires const references for all arguments.
+    void play(const std::vector<uint8_t>& data, const uint32_t& can_id, const bool& rtr) override {
         this->callback->data_recv(data, can_id);
     }
 };
@@ -33,10 +34,22 @@ public:
       this->setup_polling();
     }
   }
+
   /* CAN listening */
   void setup_listening() {
-    this->can_trigger = new CanbusTriggerProxy(this->canbus, this->can_recv_id, this);
-    this->can_trigger->setup();
+    // Instantiate a standard CanbusTrigger directly
+    this->can_trigger = new canbus::CanbusTrigger(this->canbus, this->can_recv_id, 0x1fffffff, true);
+    
+    // FIX: We MUST manually add the trigger to the CAN bus driver!
+    // Without this, the component is completely deaf to incoming CAN data.
+    this->canbus->add_trigger(this->can_trigger);
+    
+    // Create an automation and attach it to the trigger
+    auto *automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(this->can_trigger);
+    
+    // Create our custom callback action and attach it to the automation
+    auto *action = new CanCallbackAction(this);
+    automation->add_actions({action});
   }
 
   int parse_data(std::vector<uint8_t> data) {
@@ -52,17 +65,19 @@ public:
     return 0;
   }
 
-  virtual void data_recv(std::vector<uint8_t> data, uint32_t can_id) {
+  void data_recv(std::vector<uint8_t> data, uint32_t can_id) override {
     this->inferred_data_len = data.size();
     int value = this->parse_data(data);
     this->publish(value * this->value_factor);
   }
+  
   virtual void publish(float value)=0;
 
   /* CAN polling */
   void setup_polling() {
     this->set_interval("rego_poll", this->poll_interval, [this]() { this->rego_poll(); });
   }
+  
   void rego_poll() {
     this->canbus->send_data(this->can_poll_id, true, true, std::vector<uint8_t>());
   }
@@ -93,7 +108,10 @@ public:
   }
 
   void send_data(uint32_t can_id, int32_t value) {
-    if (this->inferred_data_len == 1) {
+    // Catch len=0 before it causes an error, silently ignore until first CAN frame is received
+    if (this->inferred_data_len == 0) {
+      return;
+    } else if (this->inferred_data_len == 1) {
       std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)value });
       this->canbus->send_data(can_id, true, false, can_data);
     } else if (this->inferred_data_len == 2) {
