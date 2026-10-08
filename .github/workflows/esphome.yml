@@ -21,7 +21,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install esphome
-        echo "{wifi_ssid: \"TEST_SSID\",wifi_password: \"TEST_PASS\",fallback_password: \"\",hass_api_password: \"\",ota_password: \"\"}" > secrets.yaml
+        echo "{wifi_ssid: \"TEST_SSID\",wifi_password: \"TEST_PASS\",fallback_password: \"\",api_encryption_key: \"pY8hY3H9QqkqzQ0x3kM8xXxJm4bq3mJ8y0m0dS1H0X4=\",ota_password: \"\"}" > secrets.yaml
         esphome compile rego1000-v1.12.1.yaml
         esphome compile rego1000-v3.4.0.yaml
         esphome compile rego1000-v3.6.0.yaml

@@ -18,7 +18,8 @@ logger:
   baud_rate: 0
 
 api:
-  password: !secret hass_api_password
+  encryption:
+    key: !secret api_encryption_key
 
 # The OTA configuration was changed in esphome 2024.06.
 # For earlier releases the '- platform: esphome' should not be included
