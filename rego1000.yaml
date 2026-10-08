@@ -2,7 +2,7 @@ esphome:
   name: heatpump-logger
 
 esp32:
-  board: esp32dev
+  board: nodemcu-32s
   framework:
     type: arduino
 
@@ -18,13 +18,14 @@ logger:
   baud_rate: 0
 
 api:
-#  password: !secret hass_api_password
+  encryption:
+    key: !secret api_encryption_key
 
 # The OTA configuration was changed in esphome 2024.06.
 # For earlier releases the '- platform: esphome' should not be included
-#ota:
-# - platform: esphome
-#   password: !secret ota_password
+ota:
+  - platform: esphome
+    password: !secret ota_password
 
 external_components:
   - source: components

@@ -20,7 +20,6 @@ class CanCallbackAction : public Action<std::vector<uint8_t>, uint32_t, bool> {
 public:
     CanCallbackAction(CanCallbackInterface *callback) : callback(callback) {}
 
-    // ESPHome's Action template strictly requires const references for all arguments.
     void play(const std::vector<uint8_t>& data, const uint32_t& can_id, const bool& rtr) override {
         this->callback->data_recv(data, can_id);
     }
@@ -37,19 +36,12 @@ public:
 
   /* CAN listening */
   void setup_listening() {
-    // Instantiate a standard CanbusTrigger directly
+    // CanbusTrigger is final since ESPHome 2026.7, so wire up trigger -> automation -> action instead of subclassing
     this->can_trigger = new canbus::CanbusTrigger(this->canbus, this->can_recv_id, 0x1fffffff, true);
-    
-    // FIX: We MUST manually add the trigger to the CAN bus driver!
-    // Without this, the component is completely deaf to incoming CAN data.
-    this->canbus->add_trigger(this->can_trigger);
-    
-    // Create an automation and attach it to the trigger
     auto *automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(this->can_trigger);
-    
-    // Create our custom callback action and attach it to the automation
-    auto *action = new CanCallbackAction(this);
-    automation->add_actions({action});
+    automation->add_actions({new CanCallbackAction(this)});
+    // The trigger is not a registered component, so set it up here (registers it with the CAN bus)
+    this->can_trigger->setup();
   }
 
   int parse_data(std::vector<uint8_t> data) {
@@ -70,14 +62,14 @@ public:
     int value = this->parse_data(data);
     this->publish(value * this->value_factor);
   }
-  
+
   virtual void publish(float value)=0;
 
   /* CAN polling */
   void setup_polling() {
     this->set_interval("rego_poll", this->poll_interval, [this]() { this->rego_poll(); });
   }
-  
+
   void rego_poll() {
     this->canbus->send_data(this->can_poll_id, true, true, std::vector<uint8_t>());
   }
@@ -108,9 +100,8 @@ public:
   }
 
   void send_data(uint32_t can_id, int32_t value) {
-    // Catch len=0 before it causes an error, silently ignore until first CAN frame is received
     if (this->inferred_data_len == 0) {
-      return;
+      ESP_LOGW(TAG, "Not sending to CAN ID 0x%08X before a value has been received", (unsigned) can_id);
     } else if (this->inferred_data_len == 1) {
       std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)value });
       this->canbus->send_data(can_id, true, false, can_data);
