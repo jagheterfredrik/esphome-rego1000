@@ -2,9 +2,10 @@ esphome:
   name: heatpump-logger
 
 esp32:
-  board: nodemcu-32s
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
   framework:
-    type: arduino
+    type: esp-idf
 
 wifi:
   ssid: !secret wifi_ssid
@@ -14,7 +15,9 @@ wifi:
     password: !secret fallback_password
 
 logger:
-  level: INFO
+  #level: INFO
+  #level: VERY_VERBOSE
+  level:  DEBUG
   baud_rate: 0
 
 api:
@@ -36,10 +39,62 @@ canbus:
   - platform: esp32_can
     id: can0
     can_id: 0
-    tx_pin: GPIO23
-    rx_pin: GPIO22
+    tx_pin: GPIO4
+    rx_pin: GPIO5
     bit_rate: 125kbps
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        then:
+          - lambda: |-
+              // 1. Hämta adress från CAN ID (lägsta 16 bitarna)
+              uint16_t reg_id = can_id & 0xFFFF;
+              
+              // Om CAN ID inte innehåller adressen, kika i första två databytena
+              if (reg_id == 0 && x.size() >= 2) {
+                reg_id = (x[0] << 8) | x[1];
+              }
 
+              char reg_buf[10];
+              sprintf(reg_buf, "0x%04X", reg_id);
+
+              // 2. Beräkna värde
+              std::string val_str = "0";
+              if (x.size() >= 2) {
+                int16_t raw = (x[0] << 8) | x[1];
+                char vbuf[16];
+                sprintf(vbuf, "%.1f", raw / 10.0);
+                val_str = vbuf;
+              } else if (x.size() == 1) {
+                val_str = std::to_string(x[0]);
+              }
+
+              // Skriv till ESPHome-loggen för verifiering
+              ESP_LOGI("rego_data", "Register: %s | Värde: %s", reg_buf, val_str.c_str());
+
+          - homeassistant.event:
+              event: esphome.rego_data
+              data:
+                register: !lambda |-
+                  uint16_t reg_id = can_id & 0xFFFF;
+                  if (reg_id == 0 && x.size() >= 2) {
+                    reg_id = (x[0] << 8) | x[1];
+                  }
+                  char buf[10];
+                  sprintf(buf, "0x%04X", reg_id);
+                  return std::string(buf);
+                val: !lambda |-
+                  if (x.size() >= 2) {
+                    int16_t raw = (x[0] << 8) | x[1];
+                    char vbuf[16];
+                    sprintf(vbuf, "%.1f", raw / 10.0);
+                    return std::string(vbuf);
+                  } else if (x.size() == 1) {
+                    return std::to_string(x[0]);
+                  }
+                  return std::string("0");
+              
 climate:
   - platform: rego1000
     name: House
