@@ -156,6 +156,11 @@ binary_sensor:
 - platform: rego1000
   name: "Cold fluid pump"
   rego_listen_can_id: 0x00054${REGO_CAN_SUFFIX}
+# DHW circulation pump output. Verified on a Greenline HE (program generation 3, version 10):
+# broadcast 0x00044 switches on exactly when the circulation pump runs.
+- platform: rego1000
+  name: "DHW circulation pump"
+  rego_listen_can_id: 0x00044${REGO_CAN_SUFFIX}
 
 number:
 - platform: rego1000
@@ -181,6 +186,86 @@ number:
   max_value: 30
   step: 1
   value_factor: .1
+# DHW circulation programs. The controller stores times in 15 minute slots,
+# so value_factor .25 shows hours (13.25 = 13:15). 0xD0 means "program off"
+# and reads back as -12 h (signed byte); write 52 to switch a program off.
+- platform: rego1000
+  name: Circulation program 1 start
+  rego_variable: $PUMP_DHW_PROGRAM1_START_TIME
+  value_factor: .25
+  unit_of_measurement: h
+  min_value: 0
+  max_value: 52
+  step: .25
+  poll_interval: 5min
+- platform: rego1000
+  name: Circulation program 1 stop
+  rego_variable: $PUMP_DHW_PROGRAM1_STOP_TIME
+  value_factor: .25
+  unit_of_measurement: h
+  min_value: 0
+  max_value: 52
+  step: .25
+  poll_interval: 5min
+# Extra hot water (XDHW). XDHW_TIME starts extra hot water for N hours,
+# the weekly program (thermal disinfection) runs on XDHW_WEEKPROGRAM_DAY
+# (1 = Monday ... 7 = Sunday, 0 = off) at XDHW_WEEKPROGRAM_HOUR (controller clock).
+- platform: rego1000
+  name: Extra hot water time
+  rego_variable: $XDHW_TIME
+  unit_of_measurement: h
+  min_value: 0
+  max_value: 48
+  step: 1
+  poll_interval: 60s
+- platform: rego1000
+  name: Extra hot water weekly day
+  rego_variable: $XDHW_WEEKPROGRAM_DAY
+  min_value: 0
+  max_value: 7
+  step: 1
+  poll_interval: 5min
+- platform: rego1000
+  name: Extra hot water weekly hour
+  rego_variable: $XDHW_WEEKPROGRAM_HOUR
+  min_value: 0
+  max_value: 23
+  step: 1
+  poll_interval: 5min
+# Controller clock. Ours had drifted 9.5 h, which shifts every timed program;
+# writing these numbers (e.g. from a daily Home Assistant automation) sets it.
+- platform: rego1000
+  name: Clock hour
+  rego_variable: $DATE_HOUR
+  min_value: 0
+  max_value: 23
+  step: 1
+  poll_interval: 60s
+  entity_category: config
+- platform: rego1000
+  name: Clock minute
+  rego_variable: $DATE_MIN
+  min_value: 0
+  max_value: 59
+  step: 1
+  poll_interval: 60s
+  entity_category: config
+- platform: rego1000
+  name: Clock day
+  rego_variable: $DATE_DAY
+  min_value: 1
+  max_value: 31
+  step: 1
+  poll_interval: 10min
+  entity_category: config
+- platform: rego1000
+  name: Clock day of week
+  rego_variable: $DATE_DAY_OF_WEEK
+  min_value: 1
+  max_value: 7
+  step: 1
+  poll_interval: 10min
+  entity_category: config
 - platform: rego1000
   name: Room dial range
   rego_variable: $ROOM_DIAL_RANGE
@@ -195,3 +280,9 @@ switch:
 - platform: rego1000
   name: "Admin access"
   rego_variable: $ACCESS_LEVEL
+- platform: rego1000
+  name: "DHW circulation enabled"
+  rego_variable: $PUMP_DHW_ACTIVE
+- platform: rego1000
+  name: "Additional heat for extra hot water"
+  rego_variable: $ADDITIONAL_ALLOW_XDHW
