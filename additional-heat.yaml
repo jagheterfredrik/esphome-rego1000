@@ -20,8 +20,12 @@
 #   * The numbers and the switch below could be written without admin access on v3.6.
 #   * HW_ADDITIONAL_RELAY_x / TRIAC_x always read 0 and do not reflect the outputs.
 #
-# Heater power and steps differ between models (e.g. 3/6/9 kW on ours). Check "Additional heat max
-# power" first and set the limit accordingly. The on/off state is the existing "Additional heat"
+# Heater power and steps differ between models (e.g. 3/6/9 kW on ours; the installer manual lists 9 kW
+# per heater unit on E14-E17 and allows more than one unit). Check "Additional heat max power" first
+# and set the limit accordingly. The limit range is 0-18 kW (two 9 kW units); the pump rejects values
+# it does not accept and the read-back shows the actual value.
+# All variables used here exist in every rego1000-v*.yaml in this repo (v1.12 to v3.14), but the
+# package has only been tested on v3.6. The on/off state is the existing "Additional heat"
 # binary sensor (0x3C broadcast) in rego1000.yaml.
 
 sensor:
@@ -79,7 +83,7 @@ number:
     rego_variable: $ADDITIONAL_EFFECT_LIMITATION_COMPRESSOR
     unit_of_measurement: kW
     min_value: 0
-    max_value: 15
+    max_value: 18
     step: 0.5
     value_factor: .1
     poll_interval: 5min
