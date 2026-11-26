@@ -1,7 +1,6 @@
+#pragma once
 #include "esphome.h"
 #include "esphome/components/rego1000/rego.h"
-
-#include <vector>
 
 using namespace esphome;
 

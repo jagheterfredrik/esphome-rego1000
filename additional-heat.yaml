@@ -1,0 +1,108 @@
+# Additional heat (electric heater): monitor and limit it from Home Assistant.
+#
+# Include from your device config, e.g.:
+#   packages:
+#     additional_heat: !include additional-heat.yaml
+#
+# Uses the substitutions from rego1000-v3.6.0.yaml (verified on an IVT Greenline HE E9, Rego 1000 v3.6,
+# 3 + 6 kW heater = steps of 3 / 6 / 9 kW).
+#
+# Findings:
+#   * The "additional heat" output broadcast (0x3C) is the reliable on/off signal. Checked against a P1
+#     meter: when it turns on, consumption rises by the configured step (3 kW, ~1 kW per phase).
+#   * TILLSKOTT_UTSIGNAL_UT stayed at 0 % while the heater was running, so it is not used here.
+#   * STATS_ELECTR_ADD_HEATING / _DHW count seconds (+1724 over ~29 min of running).
+#   * ADDITIONAL_BLOCKED = 1 can have other causes than the menu setting ADDITIONAL_USER_BLOCKED. On our unit
+#     it was ADDITIONAL_BLOCK_HIGH_T2_TEMP ("max outdoor temperature for additional heat") set to -0.5 °C,
+#     so the heater never ran above that outdoor temperature.
+#   * ADDITIONAL_EFFECT_LIMITATION_COMPRESSOR caps the heater while the compressor runs (factory 50 %;
+#     ours was 9.0 kW). On our unit 3.0 kW limited the heater to the first step.
+#   * The numbers and the switch below could be written without admin access on v3.6.
+#   * HW_ADDITIONAL_RELAY_x / TRIAC_x always read 0 and do not reflect the outputs.
+#
+# Heater power and steps differ between models (e.g. 3/6/9 kW on ours). Check "Additional heat max
+# power" first and set the limit accordingly. The on/off state is the existing "Additional heat"
+# binary sensor (0x3C broadcast) in rego1000.yaml.
+
+sensor:
+  - platform: rego1000
+    name: "Additional heat blocked"
+    rego_variable: $ADDITIONAL_BLOCKED
+    value_factor: 1
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    poll_interval: 60s
+  - platform: rego1000
+    name: "Additional heat blocked by outdoor temp"
+    rego_variable: $ADDITIONAL_BLOCK_HIGH_T2
+    value_factor: 1
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    poll_interval: 60s
+  - platform: rego1000
+    name: "Additional heat external block"
+    rego_variable: $ADDITIONAL_EXTERN_BLOCKED
+    value_factor: 1
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Additional heat max power"
+    rego_variable: $ADDITIONAL_TOTAL_EFFECT_PATRON
+    value_factor: .1
+    unit_of_measurement: kW
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Additional heat hours heating"
+    rego_variable: $STATS_ELECTR_ADD_HEATING
+    value_factor: 0.000277777778   # seconds -> hours
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 2
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Additional heat hours DHW"
+    rego_variable: $STATS_ELECTR_ADD_DHW
+    value_factor: 0.000277777778   # seconds -> hours
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 2
+    poll_interval: 5min
+
+number:
+  - platform: rego1000
+    name: "Additional heat limit with compressor"
+    rego_variable: $ADDITIONAL_EFFECT_LIMITATION_COMPRESSOR
+    unit_of_measurement: kW
+    min_value: 0
+    max_value: 15
+    step: 0.5
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Additional heat max outdoor temp"
+    rego_variable: $ADDITIONAL_BLOCK_HIGH_T2_TEMP
+    unit_of_measurement: °C
+    min_value: -30
+    max_value: 40
+    step: 0.5
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Additional heat start delay"
+    rego_variable: $ADDITIONAL_DELAY_TIME
+    unit_of_measurement: min
+    min_value: 0
+    max_value: 240
+    step: 5
+    poll_interval: 5min
+
+switch:
+  - platform: rego1000
+    name: "Block additional heat"
+    rego_variable: $ADDITIONAL_USER_BLOCKED
+    poll_interval: 60s

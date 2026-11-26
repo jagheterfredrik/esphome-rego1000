@@ -1,0 +1,79 @@
+# Home Assistant dashboard card: heating curve from the heat pump, live.
+# Requires plotly-graph-card (tested with v4.0.1). Use together with heating-curve.yaml.
+# Entities are found by the end of their entity_id, so the device name prefix does not matter.
+# NOTE: the key 'y' must be quoted - an unquoted y: is parsed as boolean true.
+type: custom:plotly-graph
+title: Heating curve
+refresh_interval: 300
+raw_plotly_config: true
+extended_touch_support: false
+config:
+  scrollZoom: false
+  displayModeBar: false
+  doubleClick: false
+entities:
+  - entity: null
+    name: Heating curve
+    filters: []
+    type: scatter
+    mode: lines+markers
+    line: { color: "#1e88e5", width: 2 }
+    marker: { size: 6 }
+    fn: |
+      $fn ({ hass, vars }) => {
+        const v = (s) => {
+          const k = Object.keys(hass.states).find(e => e.startsWith('sensor.') && e.endsWith(s));
+          return k ? Number(hass.states[k].state) : NaN;
+        };
+        const D = v('curve_right_x_dut');
+        const n = (s) => {
+          const k = Object.keys(hass.states).find(e => e.startsWith('number.') && e.endsWith(s));
+          return k ? Number(hass.states[k].state) : NaN;
+        };
+        const L = n('curve_left_20_c'), R = n('curve_right_dut');
+        vars.cx = []; vars.cy = [];
+        for (let i = 0; i < 11; i++) {
+          const x = D + i * (20 - D) / 10;
+          const base = L + (20 - x) * (R - L) / (20 - D);
+          vars.cx.push(x);
+          vars.cy.push(Math.round((base + v('curve_point_y' + (i + 1) + '_local')) * 10) / 10);
+        }
+        vars.out = v('outdoor_attenuated_gt2');
+        vars.curve = v('curve_value_calculated');
+        vars.setpoint = v('heating_setpoint');
+      }
+    x: $fn ({ vars }) => vars.cx
+    'y': $fn ({ vars }) => vars.cy
+  - entity: null
+    name: Curve value now
+    filters: []
+    type: scatter
+    mode: markers
+    marker: { color: "#fb8c00", size: 12 }
+    x: $fn ({ vars }) => [vars.out]
+    'y': $fn ({ vars }) => [vars.curve]
+  - entity: null
+    name: Setpoint (incl. room sensor)
+    filters: []
+    type: scatter
+    mode: markers
+    marker: { color: "#e53935", size: 12 }
+    x: $fn ({ vars }) => [vars.out]
+    'y': $fn ({ vars }) => [vars.setpoint]
+layout:
+  height: 340
+  paper_bgcolor: rgba(0,0,0,0)
+  plot_bgcolor: rgba(0,0,0,0)
+  margin: { t: 20, l: 50, r: 20, b: 90 }
+  showlegend: true
+  xaxis:
+    title: { text: "Outdoor temperature (°C)" }
+    type: linear
+    range: [21, -31]
+    dtick: 5
+    fixedrange: true
+  yaxis:
+    title: { text: "Supply temperature (°C)" }
+    range: [10, 70]
+    fixedrange: true
+  legend: { orientation: h, 'y': -0.35 }
