@@ -14,21 +14,21 @@ CONFIG_SCHEMA = (
     switch.switch_schema(RegoSwitch)
     .extend(
         {
-            cv.GenerateID(): cv.declare_id(RegoSwitch),
             cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-            cv.Required("rego_variable"): cv.int_,
+            cv.Required("rego_variable"): cv.hex_int,
             cv.Optional("poll_interval", default="10s"): cv.update_interval,
         }
     )
+    .extend(cv.COMPONENT_SCHEMA)
 )
 
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-        
     await switch.register_switch(var, config)
+
     canbus_component = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(canbus_component))
-    cg.add(var.set_rego_variable(int(config["rego_variable"])))
+    cg.add(var.set_rego_variable(config["rego_variable"]))
     cg.add(var.set_poll_interval(config["poll_interval"]))

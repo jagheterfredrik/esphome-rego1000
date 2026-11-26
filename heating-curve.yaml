@@ -1,0 +1,537 @@
+# Heating curve: read and adjust the heat pump's own heating circuit from Home Assistant.
+#
+# Include from your device config, e.g.:
+#   packages:
+#     heating_curve: !include heating-curve.yaml
+#
+# Uses the substitutions from rego1000-v3.6.0.yaml (verified on Rego 1000 v3.6).
+#
+# Model (verified against the display and HEATING_CURVE_VALUE):
+#   * 11 points, every 5 °C from the dimensioning outdoor temperature (DUT,
+#     HEATING_CURVE_RIGHT_X_LOCAL, e.g. -30 °C) up to +20 °C.
+#   * Base line: straight line from (+20 °C, HEATING_CURVE_LEFT_Y_LOCAL) to
+#     (DUT, HEATING_CURVE_RIGHT_Y_LOCAL).
+#   * Each point = base line + offset HEATING_CURVE_Yn_LOCAL, where Y1 = DUT ... Y11 = +20 °C.
+#   * The pump interpolates linearly between points using the attenuated outdoor
+#     temperature (GT2_ATTENUATED_TEMP). HEATING_SETPOINT = curve value + room sensor influence.
+#   * Use the *_LOCAL variables. The *_GLOBAL variants belong to extra mixing circuits
+#     and writing them does not change the pump's own curve.
+
+sensor:
+  - platform: rego1000
+    name: "Curve value (calculated)"
+    id: curve_value
+    rego_variable: $HEATING_CURVE_VALUE
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    poll_interval: 60s
+  - platform: rego1000
+    name: "Outdoor attenuated (GT2)"
+    rego_variable: $GT2_ATTENUATED_TEMP
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    poll_interval: 60s
+  - platform: rego1000
+    name: "Curve right X (DUT)"
+    id: curve_dut
+    rego_variable: $HEATING_CURVE_RIGHT_X_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y1 local"
+    rego_variable: $HEATING_CURVE_Y1_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y2 local"
+    rego_variable: $HEATING_CURVE_Y2_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y3 local"
+    rego_variable: $HEATING_CURVE_Y3_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y4 local"
+    rego_variable: $HEATING_CURVE_Y4_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y5 local"
+    rego_variable: $HEATING_CURVE_Y5_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y6 local"
+    rego_variable: $HEATING_CURVE_Y6_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y7 local"
+    rego_variable: $HEATING_CURVE_Y7_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y8 local"
+    rego_variable: $HEATING_CURVE_Y8_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y9 local"
+    rego_variable: $HEATING_CURVE_Y9_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y10 local"
+    rego_variable: $HEATING_CURVE_Y10_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve point Y11 local"
+    rego_variable: $HEATING_CURVE_Y11_LOCAL
+    value_factor: .1
+    unit_of_measurement: °C
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    poll_interval: 5min
+
+  # Tracking: how much the room sensor adds on top of the curve.
+  # Consistently positive at a given outdoor temperature = curve too low there,
+  # consistently negative = curve too high (ignore periods with stove/sun heat).
+  - platform: rego1000
+    id: curve_setpoint
+    internal: true
+    rego_variable: $HEATING_SETPOINT
+    value_factor: .1
+    poll_interval: 60s
+  - platform: template
+    name: "Room sensor contribution"
+    icon: mdi:thermometer-plus
+    unit_of_measurement: °C
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 60s
+    lambda: |-
+      const float sp = id(curve_setpoint).state, cv = id(curve_value).state;
+      if (std::isnan(sp) || std::isnan(cv)) return {};
+      return sp - cv;
+number:
+  - platform: rego1000
+    name: "Curve left (+20 °C)"
+    id: curve_left
+    rego_variable: $HEATING_CURVE_LEFT_Y_LOCAL
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 50
+    step: .5
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve right (DUT)"
+    id: curve_right
+    rego_variable: $HEATING_CURVE_RIGHT_Y_LOCAL
+    unit_of_measurement: °C
+    min_value: 20
+    max_value: 80
+    step: .5
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve parallel offset"
+    rego_variable: $HEATING_CURVE_PARALLEL_OFFSET
+    unit_of_measurement: °C
+    min_value: -10
+    max_value: 10
+    step: .5
+    value_factor: .1
+    poll_interval: 5min
+  # Raw offsets on top of the base line (internal; set through the template numbers below)
+  - platform: rego1000
+    name: "Curve offset Y1"
+    id: curve_off_1
+    rego_variable: $HEATING_CURVE_Y1_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y2"
+    id: curve_off_2
+    rego_variable: $HEATING_CURVE_Y2_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y3"
+    id: curve_off_3
+    rego_variable: $HEATING_CURVE_Y3_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y4"
+    id: curve_off_4
+    rego_variable: $HEATING_CURVE_Y4_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y5"
+    id: curve_off_5
+    rego_variable: $HEATING_CURVE_Y5_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y6"
+    id: curve_off_6
+    rego_variable: $HEATING_CURVE_Y6_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y7"
+    id: curve_off_7
+    rego_variable: $HEATING_CURVE_Y7_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y8"
+    id: curve_off_8
+    rego_variable: $HEATING_CURVE_Y8_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y9"
+    id: curve_off_9
+    rego_variable: $HEATING_CURVE_Y9_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y10"
+    id: curve_off_10
+    rego_variable: $HEATING_CURVE_Y10_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  - platform: rego1000
+    name: "Curve offset Y11"
+    id: curve_off_11
+    rego_variable: $HEATING_CURVE_Y11_LOCAL
+    internal: true
+    min_value: -20
+    max_value: 40
+    step: .1
+    value_factor: .1
+    poll_interval: 5min
+  # Supply temperature per outdoor temperature. Numbered so they sort +20 ... -30.
+  - platform: template
+    name: "Heating curve 01: +20 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_11).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 10.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_11
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 10.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 02: +15 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_10).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 9.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_10
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 9.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 03: +10 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_9).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 8.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_9
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 8.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 04: +5 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_8).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 7.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_8
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 7.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 05: 0 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_7).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 6.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_7
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 6.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 06: -5 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_6).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 5.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_6
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 5.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 07: -10 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_5).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 4.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_5
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 4.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 08: -15 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_4).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 3.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_4
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 3.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 09: -20 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_3).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 2.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_3
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 2.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 10: -25 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_2).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 1.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_2
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 1.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;
+  - platform: template
+    name: "Heating curve 11: -30 °C outdoor"
+    icon: mdi:chart-bell-curve-cumulative
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 70
+    step: .5
+    mode: box
+    update_interval: 30s
+    lambda: |-
+      const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+      const float o = id(curve_off_1).state;
+      if (std::isnan(D) || std::isnan(L) || std::isnan(R) || std::isnan(o) || D >= 20.0f) return {};
+      const float t = D + 0.0f * (20.0f - D) / 10.0f;
+      return roundf((L + (20.0f - t) * (R - L) / (20.0f - D) + o) * 10.0f) / 10.0f;
+    set_action:
+      - number.set:
+          id: curve_off_1
+          value: !lambda |-
+            const float D = id(curve_dut).state, L = id(curve_left).state, R = id(curve_right).state;
+            const float t = D + 0.0f * (20.0f - D) / 10.0f;
+            return roundf((x - (L + (20.0f - t) * (R - L) / (20.0f - D))) * 10.0f) / 10.0f;

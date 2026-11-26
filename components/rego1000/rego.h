@@ -1,6 +1,5 @@
 #pragma once
 #include "esphome.h"
-
 #include <vector>
 
 using namespace esphome;
@@ -8,13 +7,21 @@ using namespace esphome;
 namespace rego {
 static const char* TAG = "Rego";
 
+// Delay before reading a value back after a write (ms)
+static const uint32_t READBACK_DELAY_MS = 500;
+
+// Numeric scheduler IDs (ESPHome 2026.11 recommends IDs instead of string names)
+static constexpr uint32_t SCHED_ID_POLL = 1;
+static constexpr uint32_t SCHED_ID_READBACK = 2;
+static constexpr uint32_t SCHED_ID_INDOOR_TEMP = 3;
+static constexpr uint32_t SCHED_ID_INITIAL_POLL = 4;
+
 class CanCallbackInterface
 {
   public:
-  virtual void data_recv(std::vector<uint8_t>, uint32_t) = 0;
+  virtual void data_recv(const std::vector<uint8_t>& data, uint32_t can_id) = 0;
 };
 
-// Using composition instead of inheritance for final class CanbusTrigger
 class CanCallbackAction : public Action<std::vector<uint8_t>, uint32_t, bool> {
     CanCallbackInterface *callback;
 public:
@@ -34,17 +41,14 @@ public:
     }
   }
 
-  /* CAN listening */
   void setup_listening() {
-    // CanbusTrigger is final since ESPHome 2026.7, so wire up trigger -> automation -> action instead of subclassing
     this->can_trigger = new canbus::CanbusTrigger(this->canbus, this->can_recv_id, 0x1fffffff, true);
     auto *automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(this->can_trigger);
     automation->add_actions({new CanCallbackAction(this)});
-    // The trigger is not a registered component, so set it up here (registers it with the CAN bus)
     this->can_trigger->setup();
   }
 
-  int parse_data(std::vector<uint8_t> data) {
+  int parse_data(const std::vector<uint8_t>& data) {
     if (data.size() == 1) {
         return (int8_t)data[0];
     } else if (data.size() == 2) {
@@ -52,29 +56,37 @@ public:
     } else if (data.size() == 4) {
         return (int32_t)(data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]);
     } else {
-        ESP_LOGE(TAG, "Received DLC %d is invalid. Has to be 1, 2 or 4", data.size());
+        ESP_LOGE(TAG, "Received DLC %zu is invalid. Has to be 1, 2 or 4", data.size());
     }
     return 0;
   }
 
-  void data_recv(std::vector<uint8_t> data, uint32_t can_id) override {
+  void data_recv(const std::vector<uint8_t>& data, uint32_t can_id) override {
     this->inferred_data_len = data.size();
     int value = this->parse_data(data);
-    this->publish(value * this->value_factor);
+    // Multiply in double precision so large counters (e.g. energy) are only
+    // rounded once, when converted to float in publish().
+    this->publish((float)((double)value * this->value_factor));
   }
 
   virtual void publish(float value)=0;
 
-  /* CAN polling */
   void setup_polling() {
-    this->set_interval("rego_poll", this->poll_interval, [this]() { this->rego_poll(); });
+    this->set_interval(SCHED_ID_POLL, this->poll_interval, [this]() { this->rego_poll(); });
   }
 
   void rego_poll() {
-    this->canbus->send_data(this->can_poll_id, true, true, std::vector<uint8_t>());
+    this->canbus->send_data(this->can_poll_id, true, true, {});
   }
 
-  /* Config */
+  // Read the value back shortly after a write so Home Assistant shows what the
+  // heat pump actually has (the pump may reject or overwrite the value).
+  void schedule_readback() {
+    if (!this->is_polling)
+      return;
+    this->set_timeout(SCHED_ID_READBACK, READBACK_DELAY_MS, [this]() { this->rego_poll(); });
+  }
+
   void set_canbus(canbus::Canbus *canbus) {
     this->canbus = canbus;
   }
@@ -91,7 +103,7 @@ public:
     this->is_polling = false;
   }
 
-  void set_value_factor(float value_factor) {
+  void set_value_factor(double value_factor) {
     this->value_factor = value_factor;
   }
 
@@ -99,21 +111,28 @@ public:
     this->poll_interval = poll_interval;
   }
 
-  void send_data(uint32_t can_id, int32_t value) {
+  // Returns true if the CAN driver accepted the frame, false if nothing was sent
+  bool send_data(uint32_t can_id, int32_t value) {
+    std::vector<uint8_t> payload;
     if (this->inferred_data_len == 0) {
       ESP_LOGW(TAG, "Not sending to CAN ID 0x%08X before a value has been received", (unsigned) can_id);
+      return false;
     } else if (this->inferred_data_len == 1) {
-      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)value });
-      this->canbus->send_data(can_id, true, false, can_data);
+      payload = { (uint8_t)value };
     } else if (this->inferred_data_len == 2) {
-      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) });
-      this->canbus->send_data(can_id, true, false, can_data);
+      payload = { (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) };
     } else if (this->inferred_data_len == 4) {
-      std::vector<uint8_t> can_data = std::vector<uint8_t>({ (uint8_t)((value >> 24) & 0xff), (uint8_t)((value >> 16) & 0xff), (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) });
-      this->canbus->send_data(can_id, true, false, can_data);
+      payload = { (uint8_t)((value >> 24) & 0xff), (uint8_t)((value >> 16) & 0xff), (uint8_t)((value >> 8) & 0xff), (uint8_t)(value & 0xff) };
     } else {
       ESP_LOGE(TAG, "Tried to send data with invalid inferred length %d", this->inferred_data_len);
+      return false;
     }
+    canbus::Error err = this->canbus->send_data(can_id, true, false, payload);
+    if (err != canbus::ERROR_OK) {
+      ESP_LOGW(TAG, "CAN send to 0x%08X failed (error %d)", (unsigned) can_id, (int) err);
+      return false;
+    }
+    return true;
   }
 
 protected:
@@ -122,9 +141,8 @@ protected:
   uint32_t poll_interval;
   uint8_t inferred_data_len = 0;
   bool is_polling = false;
-  float value_factor = 1;
+  double value_factor = 1;
   canbus::Canbus *canbus;
   canbus::CanbusTrigger *can_trigger;
 };
-
 }
